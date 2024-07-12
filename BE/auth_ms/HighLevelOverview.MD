@@ -65,3 +65,10 @@
 #### Communication
 
 - The auth microservice will send user action data to the log microservice through RabbitMQ.
+
+#### End Points
+
+- /fresh
+- /refresh
+- /revoke
+- /verify
