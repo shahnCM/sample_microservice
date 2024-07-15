@@ -11,20 +11,21 @@
 #### Sessions Table
 
 - id: (primary key)
+- user_id: ULID (foreign key to users table)
 - started_at: datetime
 - expired_at: datetime (nullable)
 - refresh_count: integer
-- user_id: ULID (foreign key to users table)
 
 #### Tokens Table
 
-- id: (primary key)
+- id: (primary key) ULID
 - user_id: (foreign key to users table)
 - session_id: (foreign key to sessions table)
-- jwt_token: string
-- refresh_token: string
+- jwt_token: string (Nullable)
+- refresh_token: string (Nullable)
 - issued_at: datetime
-- expires_at: datetime
+- jwt_expires_at: datetime
+- refresh_expires_at: datetime
 - token_status: enum ('fresh', 'refreshed', 'revoked')
 
 #### Relations
