@@ -1,19 +1,24 @@
 package common
 
 import (
-	"auth_ms/pkg/dto"
+	"auth_ms/pkg/dto/response"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
 	"strconv"
+	"time"
+
+	"github.com/oklog/ulid/v2"
+
+	crypto_rand "crypto/rand"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/iancoleman/strcase"
 )
 
-func HandleResponse(ctx *fiber.Ctx, res *dto.GenericServiceResponseDto) error {
+func HandleResponse(ctx *fiber.Ctx, res *response.GenericServiceResponseDto) error {
 	if res.StatusCode < 300 || res.StatusCode == 304 {
 		return SuccessResponse(ctx, res.StatusCode, res.Data, res.Meta, res.Links)
 	}
@@ -22,7 +27,7 @@ func HandleResponse(ctx *fiber.Ctx, res *dto.GenericServiceResponseDto) error {
 }
 
 func SuccessResponse(ctx *fiber.Ctx, code int, data any, meta any, links any) error {
-	return ctx.Status(code).JSON(&dto.SuccessResponseDto{
+	return ctx.Status(code).JSON(&response.SuccessResponseDto{
 		Status:     "Success",
 		StatusCode: code,
 		Data:       data,
@@ -32,15 +37,15 @@ func SuccessResponse(ctx *fiber.Ctx, code int, data any, meta any, links any) er
 }
 
 func ErrorResponse(ctx *fiber.Ctx, code int, message any) error {
-	return ctx.Status(code).JSON(&dto.ErrorResponseDto{
+	return ctx.Status(code).JSON(&response.ErrorResponseDto{
 		Status:       "Error",
 		StatusCode:   code,
 		ErrorMessage: message,
 	})
 }
 
-func ValidationErrorResponse(ctx *fiber.Ctx, validationErrorElements []*dto.ValidationErrorElementDto) error {
-	return ctx.Status(422).JSON(&dto.ValidationErrorResponseDto{
+func ValidationErrorResponse(ctx *fiber.Ctx, validationErrorElements []*response.ValidationErrorElementDto) error {
+	return ctx.Status(422).JSON(&response.ValidationErrorResponseDto{
 		Status:           "Error",
 		StatusCode:       422,
 		ErrorMessage:     "Validation Error",
@@ -48,14 +53,14 @@ func ValidationErrorResponse(ctx *fiber.Ctx, validationErrorElements []*dto.Vali
 	})
 }
 
-func ValidateRequest(data any) []*dto.ValidationErrorElementDto {
+func ValidateRequest(data any) []*response.ValidationErrorElementDto {
 	var validate = validator.New()
-	var errors []*dto.ValidationErrorElementDto
+	var errors []*response.ValidationErrorElementDto
 
 	if err := validate.Struct(data); err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
 
-			var element dto.ValidationErrorElementDto
+			var element response.ValidationErrorElementDto
 
 			value := err.Param()
 			if value == "" {
@@ -142,7 +147,7 @@ func CurrentUrl(ctx *fiber.Ctx) string {
 	return ctx.Protocol() + "://" + ctx.Hostname() + ctx.Path()
 }
 
-func PaginateResponse(searchKey string, forList bool, currentUrl string, currentPage int, size int, data any, total int) *dto.GenericServiceResponseDto {
+func PaginateResponse(searchKey string, forList bool, currentUrl string, currentPage int, size int, data any, total int) *response.GenericServiceResponseDto {
 	currentUrl = currentUrl + "?key=" + searchKey
 	total, from := total, (size*(currentPage-1))+1
 	to, prevPage, nextPage, lastPage := from+size, currentPage-1, currentPage+1, int(math.Ceil(float64(total)/float64(size)))
@@ -179,10 +184,23 @@ func PaginateResponse(searchKey string, forList bool, currentUrl string, current
 	json.Unmarshal([]byte(meta), &metaMap)
 	json.Unmarshal([]byte(links), &linksMap)
 
-	return &dto.GenericServiceResponseDto{
+	return &response.GenericServiceResponseDto{
 		StatusCode: 200,
 		Data:       data,
 		Meta:       metaMap,
 		Links:      linksMap,
 	}
+}
+
+func GenerateULID() (*string, error) {
+	timestamp := time.Now().UTC()
+	entropy := ulid.Monotonic(crypto_rand.Reader, 0)
+	ulid, err := ulid.New(ulid.Timestamp(timestamp), entropy)
+	if err != nil {
+		log.Printf("failed to generate ULID: %v", err)
+		return nil, err
+	}
+
+	ulidStr := ulid.String()
+	return &ulidStr, nil
 }

@@ -1,4 +1,4 @@
-package dto
+package response
 
 type SuccessResponseDto struct {
 	Status     string `json:"status"`
