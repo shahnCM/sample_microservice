@@ -2,9 +2,10 @@ package main
 
 import (
 	"auth_ms/pkg/config"
+	"auth_ms/pkg/migration"
+	"auth_ms/pkg/provider/database/mariadb10"
 	"auth_ms/pkg/queue"
 	"auth_ms/pkg/route"
-	"fmt"
 	"log"
 	"os"
 
@@ -16,15 +17,22 @@ import (
 
 func main() {
 	log.Println("SERVER INITIATING")
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal("Error loading .env file")
+
+	if err := godotenv.Load(".env"); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	if err := queue.Init(); err != nil {
-		log.Println(fmt.Sprintf("Failed to initialize RabbitMQ queue: %v", err))
+		log.Printf("Failed to initialize RabbitMQ queue: %v", err)
 	} else {
 		log.Println("Connected to RabbitMQ")
+	}
+
+	if err := mariadb10.ConnectToMariaDb10(); err != nil {
+		log.Printf("Failed to initialize Database: %v", err)
+	} else {
+		log.Println("Connected to Database")
+		migration.RunMigration()
 	}
 
 	app := fiber.New(config.FiberConfig())
