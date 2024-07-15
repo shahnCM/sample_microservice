@@ -18,7 +18,8 @@ func InitApiRoutes(app *fiber.App) {
 
 	auth := v1.Group("/auth/token")
 
-	auth.Post("/fresh", controller.Fresh)
+	auth.Post("/login", controller.Login)
+	auth.Post("/register", controller.Register)
 	auth.Put("/verify", controller.Verify)
 	auth.Get("/revoke", controller.Revoke)
 	auth.Get("/refresh", controller.Refresh)
