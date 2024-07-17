@@ -7,10 +7,12 @@ import (
 	"auth_ms/pkg/model"
 	"auth_ms/pkg/repository"
 	"time"
+
+	"gorm.io/gorm"
 )
 
-func GetToken(tokenIdP *string) (*response.GenericServiceResponseDto, error) {
-	tokenRepo := repository.NewTokenRepository()
+func GetToken(tx *gorm.DB, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
+	tokenRepo := repository.NewTokenRepository(tx)
 	token, err := tokenRepo.FindToken(tokenIdP)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
@@ -19,7 +21,7 @@ func GetToken(tokenIdP *string) (*response.GenericServiceResponseDto, error) {
 	return &response.GenericServiceResponseDto{StatusCode: 200, Data: token}, nil
 }
 
-func StoreToken(userIdP *uint, sessionIdP *uint, ulidP *string, tokenDataP *dto.TokenDataDto) (*response.GenericServiceResponseDto, error) {
+func StoreToken(tx *gorm.DB, userIdP *uint, sessionIdP *uint, ulidP *string, tokenDataP *dto.TokenDataDto) (*response.GenericServiceResponseDto, error) {
 	tokenModelP := &model.Token{
 		Id:               ulidP,
 		UserId:           userIdP,
@@ -31,7 +33,7 @@ func StoreToken(userIdP *uint, sessionIdP *uint, ulidP *string, tokenDataP *dto.
 		RefreshToken:     tokenDataP.Refresh.Token,
 	}
 
-	tokenRepo := repository.NewTokenRepository()
+	tokenRepo := repository.NewTokenRepository(tx)
 	err := tokenRepo.SaveToken(tokenModelP)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 422, Data: nil}, err
@@ -40,8 +42,8 @@ func StoreToken(userIdP *uint, sessionIdP *uint, ulidP *string, tokenDataP *dto.
 	return &response.GenericServiceResponseDto{StatusCode: 201, Data: tokenModelP}, nil
 }
 
-func UpdateTokenStatus(tokenIdP *string, tokenStatus string) (*response.GenericServiceResponseDto, error) {
-	tokenRepo := repository.NewTokenRepository()
+func UpdateTokenStatus(tx *gorm.DB, tokenIdP *string, tokenStatus string) (*response.GenericServiceResponseDto, error) {
+	tokenRepo := repository.NewTokenRepository(tx)
 	err := tokenRepo.UpdateTokenStatus(tokenIdP, tokenStatus)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 422, Data: nil}, err

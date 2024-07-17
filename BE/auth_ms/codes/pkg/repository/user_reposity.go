@@ -12,25 +12,25 @@ import (
 type UserRepository interface {
 	FindUserById(userIdP *uint) (*model.User, error)
 	FindUser(identifier string, password string) (*model.User, error)
-	UpdateUser(userIdP *uint, sessionIdP *uint, tokenIdP *string) error
+	UpdateUser(userIdP *uint, updatesP *map[string]any) error
 	SaveUser(user *model.User) error
 }
 
-type userRepository struct {
-	db *gorm.DB
-}
-
-func NewUserRepository() UserRepository {
+func NewUserRepository(tx *gorm.DB) UserRepository {
+	if tx != nil {
+		return &baseRepository{db: tx}
+	}
 	db := mariadb10.GetMariaDb10()
-	return &userRepository{db: db}
+	return &baseRepository{db: db}
 }
 
-func (r *userRepository) FindUserById(userIdP *uint) (*model.User, error) {
+func (r *baseRepository) FindUserById(userIdP *uint) (*model.User, error) {
 	var user model.User
+	// var session model.Session
 	if err := r.db.Unscoped().
-		// Preload("Sessions", "ends_at > ?", time.Now()).
-		// Preload("Sessions.Tokens", "jwt_expires_at > ?", time.Now()).
-		// Preload("Tokens", "jwt_expires_at > ?", time.Now()).
+		Preload("LastSession", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id DESC").Limit(1)
+		}).
 		Where("id = ?", userIdP).
 		First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -41,12 +41,13 @@ func (r *userRepository) FindUserById(userIdP *uint) (*model.User, error) {
 	return &user, nil
 }
 
-func (r *userRepository) FindUser(identifier string, password string) (*model.User, error) {
+func (r *baseRepository) FindUser(identifier string, password string) (*model.User, error) {
 	var user model.User
+	// var session model.Session
 	if err := r.db.Unscoped().
-		// Preload("Sessions", "ends_at > ?", time.Now()).
-		// Preload("Sessions.Tokens", "jwt_expires_at > ?", time.Now()).
-		// Preload("Tokens", "jwt_expires_at > ?", time.Now()).
+		Preload("LastSession", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id DESC").Limit(1)
+		}).
 		Where("username = ? OR email = ?", identifier, identifier).
 		Where("password = ?", password).
 		First(&user).Error; err != nil {
@@ -58,16 +59,16 @@ func (r *userRepository) FindUser(identifier string, password string) (*model.Us
 	return &user, nil
 }
 
-func (r *userRepository) SaveUser(user *model.User) error {
+func (r *baseRepository) SaveUser(user *model.User) error {
 	return r.db.Create(user).Error
 }
 
-func (r *userRepository) UpdateUser(userIdP *uint, sessionIdP *uint, tokenIdP *string) error {
+func (r *baseRepository) UpdateUser(userIdP *uint, updatesP *map[string]any) error {
 	if err := r.db.Model(&model.User{}).Unscoped().
 		Where("id = ?", userIdP).
-		Unscoped().
-		Update("last_session_id", sessionIdP).
-		Update("last_token_id", tokenIdP).Error; err != nil {
+		Updates(updatesP).
+		Error; err != nil {
+
 		return err
 	}
 	return nil

@@ -15,16 +15,15 @@ type TokenRepository interface {
 	UpdateTokenStatus(identifier *string, tokenStatus string) error
 }
 
-type tokenRepository struct {
-	db *gorm.DB
-}
-
-func NewTokenRepository() TokenRepository {
+func NewTokenRepository(tx *gorm.DB) TokenRepository {
+	if tx != nil {
+		return &baseRepository{db: tx}
+	}
 	db := mariadb10.GetMariaDb10()
-	return &tokenRepository{db: db}
+	return &baseRepository{db: db}
 }
 
-func (r *tokenRepository) FindToken(identifier *string) (*model.Token, error) {
+func (r *baseRepository) FindToken(identifier *string) (*model.Token, error) {
 	var token model.Token
 	if err := r.db.Unscoped().
 		// Preload("Session").
@@ -38,11 +37,11 @@ func (r *tokenRepository) FindToken(identifier *string) (*model.Token, error) {
 	return &token, nil
 }
 
-func (r *tokenRepository) SaveToken(token *model.Token) error {
+func (r *baseRepository) SaveToken(token *model.Token) error {
 	return r.db.Unscoped().Create(token).Error
 }
 
-func (r *tokenRepository) UpdateTokenStatus(identifier *string, tokenStatus string) error {
+func (r *baseRepository) UpdateTokenStatus(identifier *string, tokenStatus string) error {
 	if err := r.db.Unscoped().Model(&model.Token{}).
 		Where("id = ?", identifier).
 		Update("token_status", tokenStatus).Error; err != nil {
