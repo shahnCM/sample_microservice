@@ -10,3 +10,8 @@ type TokenDto struct {
 	Token    *string `json:"token"`
 	TokenExp *int64  `json:"expires_at"`
 }
+
+type RefreshTokenDto struct {
+	Type  string  `json:"type"`
+	Token *string `json:"token"`
+}

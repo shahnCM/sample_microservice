@@ -13,7 +13,7 @@
 - id: (primary key)
 - user_id: ULID (foreign key to users table)
 - started_at: datetime
-- expired_at: datetime (nullable)
+- expires_at: datetime (nullable)
 - refresh_count: integer
 
 #### Tokens Table
@@ -45,12 +45,12 @@
 #### Token Refreshing Logic
 
 - When refreshing a token, ensure that the token's token_status is fresh.
-- A token can only be refreshed if the associated session's expired_at is null.
+- A token can only be refreshed if the associated session's expires_at is null.
 
 #### Token Revocation
 
 - Revoked tokens are marked with token_status set to revoked.
-- The associated session’s expired_at is updated to the current time.
+- The associated session’s expires_at is updated to the current time.
 
 #### User Roles
 

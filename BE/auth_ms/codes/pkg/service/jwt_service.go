@@ -115,6 +115,7 @@ func generateRefreshToken(claimsP *Claims) (*string, *int64, error) {
 
 func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
 	claimsP := SetClaims(userId, userRole, tokenIdP)
+
 	results := make(chan *dto.TokenDto, 2)
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -122,23 +123,21 @@ func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string) (*
 	safeasync.Run(func() {
 		defer wg.Done() // Decrement the counter when the goroutine completes
 		jwtTokenP, jwtExpiresInP, _ := generateJWT(claimsP)
-		jwtTokenDataP := &dto.TokenDto{
+		results <- &dto.TokenDto{
 			Type:     "JWT",
 			Token:    jwtTokenP,
 			TokenExp: jwtExpiresInP,
 		}
-		results <- jwtTokenDataP
 	})
 
 	safeasync.Run(func() {
 		defer wg.Done() // Decrement the counter when the goroutine completes
 		refreshTokenP, refreshExpiresInP, _ := generateRefreshToken(claimsP)
-		refreshTokenDataP := &dto.TokenDto{
+		results <- &dto.TokenDto{
 			Type:     "REFRESH",
 			Token:    refreshTokenP,
 			TokenExp: refreshExpiresInP,
 		}
-		results <- refreshTokenDataP
 	})
 
 	wg.Wait()
@@ -185,10 +184,9 @@ func VerifyJWT(token *string) (*response.GenericServiceResponseDto, error) {
 	}
 
 	if time.Now().Unix() > *claims.Exp {
-		return nil, fmt.Errorf("token has expired")
+		return &response.GenericServiceResponseDto{StatusCode: 401, Data: &claims}, nil
 	}
 
-	// return &claims, nil
 	return &response.GenericServiceResponseDto{StatusCode: 200, Data: &claims}, nil
 }
 
@@ -219,7 +217,7 @@ func VerifyRefreshToken(token *string) (*response.GenericServiceResponseDto, err
 	}
 
 	if time.Now().Unix() > *claims.Exp {
-		return nil, fmt.Errorf("token has expired")
+		return &response.GenericServiceResponseDto{StatusCode: 401, Data: &claims}, nil
 	}
 
 	// return &claims, nil

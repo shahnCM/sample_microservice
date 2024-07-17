@@ -2,6 +2,7 @@ package main
 
 import (
 	"auth_ms/pkg/config"
+	"auth_ms/pkg/helper/safeasync"
 	"auth_ms/pkg/migration"
 	"auth_ms/pkg/provider/database/mariadb10"
 	"auth_ms/pkg/queue"
@@ -20,6 +21,8 @@ func main() {
 
 	if err := godotenv.Load(".env"); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
+	} else {
+		log.Println("Loaded .env file")
 	}
 
 	if err := queue.Init(); err != nil {
@@ -31,15 +34,14 @@ func main() {
 	if err := mariadb10.ConnectToMariaDb10(); err != nil {
 		log.Printf("Failed to initialize Database: %v", err)
 	} else {
+		safeasync.Run(migration.RunMigration)
 		log.Println("Connected to Database")
-		migration.RunMigration()
 	}
 
 	app := fiber.New(config.FiberConfig())
-	app.Use(logger.New(logger.Config{
-		Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
-	}))
+	app.Use(logger.New(logger.Config{Format: "[${ip}]:${port} ${status} - ${method} ${path}\n"}))
 	app.Use(recover.New(config.RecoveryConfig()))
+
 	route.InitApiRoutes(app)
 
 	port := os.Getenv("SERVER_PORT")
