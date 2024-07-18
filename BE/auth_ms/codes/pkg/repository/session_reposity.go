@@ -15,10 +15,7 @@ type SessionRepository interface {
 	UpdateSession(sessionIdP *uint, updates *map[string]any) error
 }
 
-func NewSessionRepository(tx *gorm.DB) SessionRepository {
-	if tx != nil {
-		return &baseRepository{db: tx}
-	}
+func NewSessionRepository() SessionRepository {
 	db := mariadb10.GetMariaDb10()
 	return &baseRepository{db: db}
 }

@@ -28,7 +28,7 @@ func FreshToken(ctx *fiber.Ctx) error {
 	var err error
 
 	// Verify Username & Password
-	responseP, err = service.GetUser(nil, userRegReqP)
+	responseP, err = service.GetUser(userRegReqP)
 	if err != nil {
 		log.Println(err)
 		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid Credentials")
@@ -51,42 +51,41 @@ func FreshToken(ctx *fiber.Ctx) error {
 	// Asynchronously manage associated session & token
 	defer safeasync.Run(func() {
 
-		tx := mariadb10.GetMariaDb10().Begin()
-		if tx.Error != nil {
-			log.Println("! CRITICAL Could not start transaction:", tx.Error)
+		err := mariadb10.TransactionBegin().Error
+		if err != nil {
+			log.Println("! CRITICAL Could not start transaction:" + err.Error())
 			return
 		}
 
 		// Create a New Associated Session
-		responseP, err = service.StoreSession(tx, &userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
+		responseP, err = service.StoreSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
 		if err != nil {
-			tx.Rollback()
+			mariadb10.TransactionRollback()
 			log.Println("! CRITICAL " + err.Error())
 			return
 		}
 		sessionModelP := responseP.Data.(*model.Session)
 
 		// Update user with new session id and new token id
-		_, err = service.UpdateUserActiveSessionAndToken(tx, &userModelP.Id, &sessionModelP.Id, ulidP)
+		_, err = service.UpdateUserActiveSessionAndToken(&userModelP.Id, &sessionModelP.Id, ulidP)
 		if err != nil {
-			tx.Rollback()
+			mariadb10.TransactionRollback()
 			log.Println("! CRITICAL " + err.Error())
 			return
 		}
 
 		// End last active session
 		if userModelP.LastSessionId != nil {
-			_, err = service.EndSession(tx, userModelP.LastSessionId)
+			_, err = service.EndSession(userModelP.LastSessionId)
 			if err != nil {
-				tx.Rollback()
+				mariadb10.TransactionRollback()
 				log.Println("! CRITICAL " + err.Error())
 				return
 			}
 		}
 
 		// Commit the transaction
-		if err := tx.Commit().Error; err != nil {
-			tx.Rollback()
+		if err := mariadb10.TransactionCommit().Error; err != nil {
 			log.Println("! CRITICAL Transaction commit failed:", err.Error())
 			return
 		}
@@ -104,7 +103,7 @@ func RegisterUser(ctx *fiber.Ctx) error {
 	}
 
 	// Store Username & Password
-	_, err := service.StoreUser(nil, userP)
+	_, err := service.StoreUser(userP)
 	if err != nil {
 		// return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, strings.Split(err.Error(), ":")[1])
 		return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, err.Error())
@@ -182,7 +181,7 @@ func RefreshToken(ctx *fiber.Ctx) error {
 	claims := claimsArr[0]
 
 	// check database fix session or token faults if there's any
-	responseP, err = service.GetUserById(nil, &claims.UserId)
+	responseP, err = service.GetUserById(&claims.UserId)
 	if err != nil {
 		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Invalid refresh token, No user with this token")
 	}
@@ -210,29 +209,29 @@ func RefreshToken(ctx *fiber.Ctx) error {
 	// Asynchronously manage associated session & token
 	defer safeasync.Run(func() {
 
-		tx := mariadb10.GetMariaDb10().Begin()
-		if tx.Error != nil {
-			log.Println("! CRITICAL Could not start transaction:", tx.Error)
+		err = mariadb10.TransactionBegin().Error
+		if err != nil {
+			log.Println("! CRITICAL Could not start transaction:", err.Error())
 		}
 
 		// Update active Associated Session's tokenId, jwtExpiresAt, refreshExpiresAt, refreshCount
-		_, err = service.RefreshSession(tx, userModelP.LastSessionId, &userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp, &userLastSessionModelP.RefreshCount)
+		_, err = service.RefreshSession(userModelP.LastSessionId, &userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp, &userLastSessionModelP.RefreshCount)
 		if err != nil {
-			tx.Rollback()
+			mariadb10.TransactionRollback()
 			log.Println("! CRITICAL " + err.Error())
 			return
 		}
 
 		// Update user with new token id
-		_, err = service.UpdateUserActiveToken(tx, &userModelP.Id, ulidP)
+		_, err = service.UpdateUserActiveToken(&userModelP.Id, ulidP)
 		if err != nil {
-			tx.Rollback()
+			mariadb10.TransactionRollback()
 			log.Println("! CRITICAL " + err.Error())
 			return
 		}
 
 		// Commit the transaction
-		if err := tx.Commit().Error; err != nil {
+		if err := mariadb10.TransactionCommit().Error; err != nil {
 			log.Println("! CRITICAL Transaction commit failed:", err.Error())
 			return
 		}
@@ -265,7 +264,7 @@ func VerifyToken(ctx *fiber.Ctx) error {
 	claims := responseP.Data.(*service.Claims)
 
 	// Fetch user by user_id from claims
-	responseP, err = service.GetUserById(nil, &claims.UserId)
+	responseP, err = service.GetUserById(&claims.UserId)
 	if err != nil {
 		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid Token, foreign")
 	}
@@ -300,7 +299,7 @@ func RevokeToken(ctx *fiber.Ctx) error {
 	defer safeasync.Run(func() {
 
 		// Fetch user by user_id
-		responseP, err = service.GetUserById(nil, &claims.UserId)
+		responseP, err = service.GetUserById(&claims.UserId)
 		if err != nil {
 			log.Println("! CRITICAL " + err.Error())
 		}
@@ -310,30 +309,30 @@ func RevokeToken(ctx *fiber.Ctx) error {
 			return
 		}
 
-		tx := mariadb10.GetMariaDb10().Begin()
-		if tx.Error != nil {
-			log.Println("! CRITICAL Could not start transaction:", tx.Error)
+		err = mariadb10.TransactionBegin().Error
+		if err != nil {
+			log.Println("! CRITICAL Could not start transaction:", err.Error())
 			return
 		}
 
 		// Update user's active session to NULL Only if its associated with the requested token
-		_, err = service.UpdateUserActiveSessionAndToken(tx, &userModelP.Id, nil, nil)
+		_, err = service.UpdateUserActiveSessionAndToken(&userModelP.Id, nil, nil)
 		if err != nil {
-			tx.Rollback()
-			log.Println("! CRITICAL " + err.Error())
+			mariadb10.TransactionRollback()
+			log.Println("! CRITICAL ", err.Error())
 			return
 		}
 
 		// End session associated with the token
-		_, err = service.EndSession(tx, userModelP.LastSessionId)
+		_, err = service.EndSession(userModelP.LastSessionId)
 		if err != nil {
-			tx.Rollback()
-			log.Println("! CRITICAL " + err.Error())
+			mariadb10.TransactionRollback()
+			log.Println("! CRITICAL ", err.Error())
 			return
 		}
 
 		// Commit the transaction
-		if err := tx.Commit().Error; err != nil {
+		if err := mariadb10.TransactionCommit().Error; err != nil {
 			log.Println("! CRITICAL Transaction commit failed:", err.Error())
 			return
 		}

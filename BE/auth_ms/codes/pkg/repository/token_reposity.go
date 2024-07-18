@@ -15,10 +15,7 @@ type TokenRepository interface {
 	UpdateTokenStatus(identifier *string, tokenStatus string) error
 }
 
-func NewTokenRepository(tx *gorm.DB) TokenRepository {
-	if tx != nil {
-		return &baseRepository{db: tx}
-	}
+func NewTokenRepository() TokenRepository {
 	db := mariadb10.GetMariaDb10()
 	return &baseRepository{db: db}
 }

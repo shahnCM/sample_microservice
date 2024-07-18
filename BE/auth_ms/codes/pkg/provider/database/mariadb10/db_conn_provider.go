@@ -10,7 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
+var txMode bool = false
 var db *gorm.DB
+var dbOg *gorm.DB
 var once sync.Once
 
 func ConnectToMariaDb10() error {
@@ -43,6 +45,8 @@ func ConnectToMariaDb10() error {
 		connectError = nil
 
 		db, err = mariaDb10river.Connect(dsn)
+		dbOg = db
+
 		if err != nil {
 			connectError = err
 			// panic(fiber.NewError(fiber.StatusInternalServerError, "failed to connect database"))
@@ -63,5 +67,29 @@ func ConnectToMariaDb10() error {
 }
 
 func GetMariaDb10() *gorm.DB {
+	return db
+}
+
+func TransactionBegin() *gorm.DB {
+	txMode = true
+	db = db.Begin()
+	return db
+}
+
+func TransactionCommit() *gorm.DB {
+	if txMode {
+		db.Commit()
+		txMode = false
+		db = dbOg
+	}
+	return db
+}
+
+func TransactionRollback() *gorm.DB {
+	if txMode {
+		db.Rollback()
+		txMode = false
+		db = dbOg
+	}
 	return db
 }

@@ -8,11 +8,10 @@ import (
 	"auth_ms/pkg/repository"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 )
 
-func GetUserById(tx *gorm.DB, userIdP *uint) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository(tx)
+func GetUserById(userIdP *uint) (*response.GenericServiceResponseDto, error) {
+	userRepo := repository.NewUserRepository()
 	user, err := userRepo.FindUserById(userIdP)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
@@ -21,8 +20,8 @@ func GetUserById(tx *gorm.DB, userIdP *uint) (*response.GenericServiceResponseDt
 	return &response.GenericServiceResponseDto{StatusCode: 200, Data: user}, nil
 }
 
-func GetUser(tx *gorm.DB, userP *request.UserLoginDto) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository(tx)
+func GetUser(userP *request.UserLoginDto) (*response.GenericServiceResponseDto, error) {
+	userRepo := repository.NewUserRepository()
 	user, err := userRepo.FindUser(userP.Username, userP.Password)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
@@ -31,7 +30,7 @@ func GetUser(tx *gorm.DB, userP *request.UserLoginDto) (*response.GenericService
 	return &response.GenericServiceResponseDto{StatusCode: 200, Data: user}, nil
 }
 
-func StoreUser(tx *gorm.DB, userP *request.UserRegistrationDto) (*response.GenericServiceResponseDto, error) {
+func StoreUser(userP *request.UserRegistrationDto) (*response.GenericServiceResponseDto, error) {
 	if userP.Password != userP.PasswordConfirm {
 		return nil, fiber.NewError(fiber.ErrUnprocessableEntity.Code, "Password mismatch")
 	}
@@ -45,7 +44,7 @@ func StoreUser(tx *gorm.DB, userP *request.UserRegistrationDto) (*response.Gener
 		LastTokenId:   nil,
 	}
 
-	userRepo := repository.NewUserRepository(tx)
+	userRepo := repository.NewUserRepository()
 	err := userRepo.SaveUser(userModelP)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 422, Data: nil}, err
@@ -54,8 +53,8 @@ func StoreUser(tx *gorm.DB, userP *request.UserRegistrationDto) (*response.Gener
 	return &response.GenericServiceResponseDto{StatusCode: 201, Data: userModelP}, nil
 }
 
-func UpdateUserActiveToken(tx *gorm.DB, userIdP *uint, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository(tx)
+func UpdateUserActiveToken(userIdP *uint, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
+	userRepo := repository.NewUserRepository()
 	updatesP := &map[string]any{
 		"last_token_id": tokenIdP,
 	}
@@ -67,8 +66,8 @@ func UpdateUserActiveToken(tx *gorm.DB, userIdP *uint, tokenIdP *string) (*respo
 	return &response.GenericServiceResponseDto{StatusCode: 204, Data: nil}, nil
 }
 
-func UpdateUserActiveSessionAndToken(tx *gorm.DB, userIdP *uint, sessionIdP *uint, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository(tx)
+func UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
+	userRepo := repository.NewUserRepository()
 	updatesP := &map[string]any{
 		"last_session_id": sessionIdP,
 		"last_token_id":   tokenIdP,

@@ -16,10 +16,7 @@ type UserRepository interface {
 	SaveUser(user *model.User) error
 }
 
-func NewUserRepository(tx *gorm.DB) UserRepository {
-	if tx != nil {
-		return &baseRepository{db: tx}
-	}
+func NewUserRepository() UserRepository {
 	db := mariadb10.GetMariaDb10()
 	return &baseRepository{db: db}
 }

@@ -5,12 +5,10 @@ import (
 	"auth_ms/pkg/model"
 	"auth_ms/pkg/repository"
 	"time"
-
-	"gorm.io/gorm"
 )
 
-func GetSession(tx *gorm.DB, sessionIdP *uint) (*response.GenericServiceResponseDto, error) {
-	sessionRepo := repository.NewSessionRepository(tx)
+func GetSession(sessionIdP *uint) (*response.GenericServiceResponseDto, error) {
+	sessionRepo := repository.NewSessionRepository()
 	sessionP, err := sessionRepo.FindSession(sessionIdP)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
@@ -19,7 +17,7 @@ func GetSession(tx *gorm.DB, sessionIdP *uint) (*response.GenericServiceResponse
 	return &response.GenericServiceResponseDto{StatusCode: 200, Data: sessionP}, nil
 }
 
-func StoreSession(tx *gorm.DB, userIdP *uint, lastTokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*response.GenericServiceResponseDto, error) {
+func StoreSession(userIdP *uint, lastTokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*response.GenericServiceResponseDto, error) {
 	sessionModelP := &model.Session{
 		UserId:        userIdP,
 		StartsAt:      time.Now(),
@@ -29,7 +27,7 @@ func StoreSession(tx *gorm.DB, userIdP *uint, lastTokenIdP *string, jwtExpiresAt
 		RefreshCount:  0,
 	}
 
-	sessionRepo := repository.NewSessionRepository(tx)
+	sessionRepo := repository.NewSessionRepository()
 	err := sessionRepo.SaveSession(sessionModelP)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 422, Data: nil}, err
@@ -38,9 +36,9 @@ func StoreSession(tx *gorm.DB, userIdP *uint, lastTokenIdP *string, jwtExpiresAt
 	return &response.GenericServiceResponseDto{StatusCode: 201, Data: sessionModelP}, nil
 }
 
-func RefreshSession(tx *gorm.DB, sessionIdP *uint, userIdP *uint, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) (*response.GenericServiceResponseDto, error) {
+func RefreshSession(sessionIdP *uint, userIdP *uint, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) (*response.GenericServiceResponseDto, error) {
 	*refreshCount++
-	sessionRepo := repository.NewSessionRepository(tx)
+	sessionRepo := repository.NewSessionRepository()
 	updatesP := &map[string]any{
 		"last_token_id":   tokenIdP,
 		"ends_at":         time.Unix(*jwtExpiresAt, 0),
@@ -55,8 +53,8 @@ func RefreshSession(tx *gorm.DB, sessionIdP *uint, userIdP *uint, tokenIdP *stri
 	return &response.GenericServiceResponseDto{StatusCode: 204, Data: nil}, nil
 }
 
-func EndSession(tx *gorm.DB, sessionIdP *uint) (*response.GenericServiceResponseDto, error) {
-	sessionRepo := repository.NewSessionRepository(tx)
+func EndSession(sessionIdP *uint) (*response.GenericServiceResponseDto, error) {
+	sessionRepo := repository.NewSessionRepository()
 	updatesP := &map[string]interface{}{
 		"ends_at":         time.Now(),
 		"refresh_ends_at": time.Now(),
