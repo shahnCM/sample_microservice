@@ -11,7 +11,7 @@ import (
 
 type UserRepository interface {
 	FindUserById(userIdP *uint) (*model.User, error)
-	FindUser(identifier string, password string) (*model.User, error)
+	FindUser(identifier string) (*model.User, error)
 	UpdateUser(userIdP *uint, updatesP *map[string]any) error
 	SaveUser(user *model.User) error
 }
@@ -38,7 +38,7 @@ func (r *baseRepository) FindUserById(userIdP *uint) (*model.User, error) {
 	return &user, nil
 }
 
-func (r *baseRepository) FindUser(identifier string, password string) (*model.User, error) {
+func (r *baseRepository) FindUser(identifier string) (*model.User, error) {
 	var user model.User
 	// var session model.Session
 	if err := r.db.Unscoped().
@@ -46,7 +46,6 @@ func (r *baseRepository) FindUser(identifier string, password string) (*model.Us
 			return db.Order("id DESC").Limit(1)
 		}).
 		Where("username = ? OR email = ?", identifier, identifier).
-		Where("password = ?", password).
 		First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fiber.ErrNotFound

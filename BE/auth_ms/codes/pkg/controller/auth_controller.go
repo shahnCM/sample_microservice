@@ -18,8 +18,8 @@ import (
 
 func FreshToken(ctx *fiber.Ctx) error {
 	// Get Post Body
-	userRegReqP := new(request.UserLoginDto)
-	if errBody, err := common.ParseRequestBody(ctx, userRegReqP); errBody != nil {
+	userLoginReqP := new(request.UserLoginDto)
+	if errBody, err := common.ParseRequestBody(ctx, userLoginReqP); errBody != nil {
 		return err
 	}
 
@@ -28,21 +28,30 @@ func FreshToken(ctx *fiber.Ctx) error {
 	var err error
 
 	// Verify Username & Password
-	responseP, err = service.GetUser(userRegReqP)
+	responseP, err = service.GetUser(userLoginReqP)
 	if err != nil {
 		log.Println(err)
 		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid Credentials")
 	}
 	userModelP := responseP.Data.(*model.User)
 
+	// Compare password
+	if !common.CompareHash(&userModelP.Password, &userLoginReqP.Password) {
+		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid Credentials")
+	}
+
 	// Generate ULID for Token
 	ulidP, err := common.GenerateULID()
 	if err != nil {
 		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Internal Server Error")
 	}
+	hashedUlid, err := common.GenerateHash(ulidP)
+	if err != nil {
+		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Internal Server Error")
+	}
 
 	// Set claims & Generate a new JWT token and Associated Refresh Token
-	responseP, err = service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, ulidP)
+	responseP, err = service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlid)
 	if err != nil {
 		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Internal Server Error")
 	}
@@ -102,8 +111,18 @@ func RegisterUser(ctx *fiber.Ctx) error {
 		return err
 	}
 
+	if userP.Password != userP.PasswordConfirm {
+		log.Println(userP.Password != userP.PasswordConfirm)
+		return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, "Password mismatch")
+	}
+	hashedPassword, err := common.GenerateHash(&userP.Password)
+	if err != nil {
+		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, fiber.ErrInternalServerError.Message)
+	}
+	userP.Password = *hashedPassword
+
 	// Store Username & Password
-	_, err := service.StoreUser(userP)
+	_, err = service.StoreUser(userP)
 	if err != nil {
 		// return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, strings.Split(err.Error(), ":")[1])
 		return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, err.Error())
@@ -167,41 +186,58 @@ func RefreshToken(ctx *fiber.Ctx) error {
 	close(claimsResults)
 
 	totalStatusResults := 0
-	var claimsArr []*service.Claims
 	for result := range statusResults {
 		totalStatusResults += result
 	}
+	if totalStatusResults != 609 {
+		return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, "Can't refresh, Jwt isn't expired")
+	}
+
+	var claimsArr []*service.Claims
 	for result := range claimsResults {
 		claimsArr = append(claimsArr, result)
 	}
-	claimsOk := *claimsArr[0].TokenId == *claimsArr[1].TokenId
-	if !claimsOk || totalStatusResults != 609 {
-		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid refresh token, 609")
+	if *claimsArr[0].TokenId != *claimsArr[1].TokenId {
+		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid Refresh/Jwt token")
 	}
 	claims := claimsArr[0]
 
 	// check database fix session or token faults if there's any
+	// *** Lock users row here ***
 	responseP, err = service.GetUserById(&claims.UserId)
 	if err != nil {
-		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Invalid refresh token, No user with this token")
+		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid Refresh token, User not found")
 	}
 	userModelP := responseP.Data.(*model.User)
-	userLastSessionModelP := userModelP.LastSession
+
+	// Check if user's active token_id exists as there's any active session running
+	if userModelP.LastTokenId == nil {
+		// *** Release Lock ***
+		return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, "No running session to refresh")
+	}
 
 	// Check if user's active token_id matches with the claim's token_id
-	if userModelP.LastTokenId == nil || *userModelP.LastTokenId != *claims.TokenId {
-		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid refresh token, Inactive token")
+	if !common.CompareHash(claims.TokenId, userModelP.LastTokenId) {
+		// *** Release Lock ***
+		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, "Invalid Refresh token")
 	}
 
 	// Generate ULID for Token
 	ulidP, err := common.GenerateULID()
 	if err != nil {
-		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Internal Server Error, ULID")
+		// *** Release Lock ***
+		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Internal Server Error, Id Error")
+	}
+	hashedUlid, err := common.GenerateHash(ulidP)
+	if err != nil {
+		// *** Release Lock ***
+		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Internal Server Error, Hash Error")
 	}
 
 	// Set claims & Generate a new JWT token and Associated Refresh Token
-	responseP, err = service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, ulidP)
+	responseP, err = service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlid)
 	if err != nil {
+		// *** Release Lock ***
 		return common.ErrorResponse(ctx, fiber.ErrInternalServerError.Code, "Internal Server Error, TOKEN ISSUE")
 	}
 	tokenDataP := responseP.Data.(*dto.TokenDataDto)
@@ -211,12 +247,14 @@ func RefreshToken(ctx *fiber.Ctx) error {
 
 		err = mariadb10.TransactionBegin().Error
 		if err != nil {
+			// *** Release Lock ***
 			log.Println("! CRITICAL Could not start transaction:", err.Error())
 		}
 
 		// Update active Associated Session's tokenId, jwtExpiresAt, refreshExpiresAt, refreshCount
-		_, err = service.RefreshSession(userModelP.LastSessionId, &userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp, &userLastSessionModelP.RefreshCount)
+		_, err = service.RefreshSession(userModelP.LastSessionId, &userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp, &userModelP.LastSession.RefreshCount)
 		if err != nil {
+			// *** Release Lock ***
 			mariadb10.TransactionRollback()
 			log.Println("! CRITICAL " + err.Error())
 			return
@@ -225,6 +263,7 @@ func RefreshToken(ctx *fiber.Ctx) error {
 		// Update user with new token id
 		_, err = service.UpdateUserActiveToken(&userModelP.Id, ulidP)
 		if err != nil {
+			// *** Release Lock ***
 			mariadb10.TransactionRollback()
 			log.Println("! CRITICAL " + err.Error())
 			return
@@ -232,10 +271,11 @@ func RefreshToken(ctx *fiber.Ctx) error {
 
 		// Commit the transaction
 		if err := mariadb10.TransactionCommit().Error; err != nil {
+			// *** Release Lock ***
 			log.Println("! CRITICAL Transaction commit failed:", err.Error())
 			return
 		}
-
+		// *** Release Lock ***
 	})
 
 	// return JWT and Refresh Token
@@ -271,7 +311,7 @@ func VerifyToken(ctx *fiber.Ctx) error {
 	userModelP := responseP.Data.(*model.User)
 
 	// Check if user's active token_id matches with the claim's token_id
-	if userModelP.LastTokenId == nil || *userModelP.LastTokenId != *claims.TokenId {
+	if userModelP.LastTokenId == nil || !common.CompareHash(claims.TokenId, userModelP.LastTokenId) {
 		return common.ErrorResponse(ctx, fiber.ErrUnauthorized.Code, fiber.ErrUnauthorized.Message)
 	}
 
@@ -305,7 +345,7 @@ func RevokeToken(ctx *fiber.Ctx) error {
 		}
 		userModelP := responseP.Data.(*model.User)
 
-		if userModelP.LastTokenId == nil || *userModelP.LastTokenId != *claims.TokenId {
+		if userModelP.LastTokenId == nil || !common.CompareHash(claims.TokenId, userModelP.LastTokenId) {
 			return
 		}
 

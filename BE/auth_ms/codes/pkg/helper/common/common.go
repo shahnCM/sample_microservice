@@ -3,6 +3,7 @@ package common
 import (
 	"auth_ms/pkg/dto/response"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/crypto/bcrypt"
 
 	crypto_rand "crypto/rand"
 
@@ -203,4 +205,27 @@ func GenerateULID() (*string, error) {
 
 	ulidStr := ulid.String()
 	return &ulidStr, nil
+}
+
+func GenerateHash(str *string) (*string, error) {
+	if str == nil {
+		return nil, errors.New("input string cannot be nil")
+	}
+
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(*str), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	hashedStr := string(hashedBytes)
+	return &hashedStr, nil
+}
+
+func CompareHash(hashedStr, plainStr *string) bool {
+	if hashedStr == nil || plainStr == nil {
+		return false
+	}
+
+	err := bcrypt.CompareHashAndPassword([]byte(*hashedStr), []byte(*plainStr))
+	return err == nil
 }

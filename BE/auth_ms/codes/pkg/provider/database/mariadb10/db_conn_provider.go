@@ -3,6 +3,7 @@ package mariadb10
 import (
 	"auth_ms/pkg/config"
 	"auth_ms/pkg/driver"
+	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -73,14 +74,15 @@ func GetMariaDb10() *gorm.DB {
 func TransactionBegin() *gorm.DB {
 	txMode = true
 	db = db.Begin()
+	log.Println("DB Transaction Begin")
 	return db
 }
 
 func TransactionCommit() *gorm.DB {
 	if txMode {
 		db.Commit()
-		txMode = false
-		db = dbOg
+		log.Println("DB Transaction Commit")
+		TxModeOff()
 	}
 	return db
 }
@@ -88,8 +90,19 @@ func TransactionCommit() *gorm.DB {
 func TransactionRollback() *gorm.DB {
 	if txMode {
 		db.Rollback()
-		txMode = false
-		db = dbOg
+		log.Println("DB Transaction Rollback")
+		TxModeOff()
 	}
 	return db
+}
+
+func TxModeOff() *gorm.DB {
+	txMode = false
+	db = dbOg
+	log.Println("DB Transaction Off")
+	return db
+}
+
+func TxModeIsOn() bool {
+	return txMode
 }

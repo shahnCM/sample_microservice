@@ -6,8 +6,6 @@ import (
 	"auth_ms/pkg/enum"
 	"auth_ms/pkg/model"
 	"auth_ms/pkg/repository"
-
-	"github.com/gofiber/fiber/v2"
 )
 
 func GetUserById(userIdP *uint) (*response.GenericServiceResponseDto, error) {
@@ -22,7 +20,7 @@ func GetUserById(userIdP *uint) (*response.GenericServiceResponseDto, error) {
 
 func GetUser(userP *request.UserLoginDto) (*response.GenericServiceResponseDto, error) {
 	userRepo := repository.NewUserRepository()
-	user, err := userRepo.FindUser(userP.Username, userP.Password)
+	user, err := userRepo.FindUser(userP.Username)
 	if err != nil {
 		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
 	}
@@ -31,10 +29,6 @@ func GetUser(userP *request.UserLoginDto) (*response.GenericServiceResponseDto, 
 }
 
 func StoreUser(userP *request.UserRegistrationDto) (*response.GenericServiceResponseDto, error) {
-	if userP.Password != userP.PasswordConfirm {
-		return nil, fiber.NewError(fiber.ErrUnprocessableEntity.Code, "Password mismatch")
-	}
-
 	userModelP := &model.User{
 		Username:      userP.Username,
 		Email:         userP.Email,

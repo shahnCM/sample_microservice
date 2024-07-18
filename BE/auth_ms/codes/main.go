@@ -1,7 +1,7 @@
 package main
 
 import (
-	"auth_ms/pkg/config"
+	"auth_ms/pkg/config/fiberconfig"
 	"auth_ms/pkg/helper/safeasync"
 	"auth_ms/pkg/migration"
 	"auth_ms/pkg/provider/database/mariadb10"
@@ -38,9 +38,9 @@ func main() {
 		log.Println("Connected to Database")
 	}
 
-	app := fiber.New(config.FiberConfig())
+	app := fiber.New(fiberconfig.FiberConfig())
 	app.Use(logger.New(logger.Config{Format: "[${ip}]:${port} ${status} - ${method} ${path}\n"}))
-	app.Use(recover.New(config.RecoveryConfig()))
+	app.Use(recover.New(fiberconfig.RecoveryConfig()))
 
 	route.InitApiRoutes(app)
 
