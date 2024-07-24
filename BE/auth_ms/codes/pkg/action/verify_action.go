@@ -13,10 +13,10 @@ func Verify(jwtToken *string) (any, *fiber.Error) {
 	// Verify token and get claims
 	responseP, err := service.VerifyJWT(jwtToken)
 	if err != nil {
-		return nil, fiber.NewError(401, "Invalid Refresh/Jwt token: Malformed")
+		return nil, fiber.NewError(401, "Invalid Jwt token: Malformed")
 	}
 	if responseP.StatusCode != 200 {
-		return nil, fiber.NewError(401, "Invalid Refresh/Jwt token: Expired")
+		return nil, fiber.NewError(401, "Invalid Jwt token: Expired")
 	}
 	claims := responseP.Data.(*service.Claims)
 
@@ -24,13 +24,13 @@ func Verify(jwtToken *string) (any, *fiber.Error) {
 	userService := service.NewUserService(nil)
 	resultP, err := userService.GetUserById(&claims.UserId)
 	if err != nil {
-		return nil, fiber.NewError(401, "Invalid Refresh/Jwt token")
+		return nil, fiber.NewError(401, "Invalid Jwt token")
 	}
 	userModelP := resultP.(*model.User)
 
 	// Check if user's active token_id matches with the claim's token_id
 	if userModelP.SessionTokenTraceId == nil || !common.CompareHash(claims.TokenId, userModelP.SessionTokenTraceId) {
-		return nil, fiber.NewError(401, "Invalid Refresh/Jwt token")
+		return nil, fiber.NewError(401, "Invalid Jwt token")
 	}
 
 	return &map[string]any{

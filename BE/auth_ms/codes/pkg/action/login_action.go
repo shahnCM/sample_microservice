@@ -25,8 +25,6 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 	}
 	userModelP := resultP.(*model.User)
 
-	log.Println(userModelP.Role)
-
 	// Compare password
 	if !common.CompareHash(&userModelP.Password, &userLoginReqP.Password) {
 		return nil, fiber.ErrUnauthorized
@@ -60,7 +58,6 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 		sessionService := service.NewSessionService(tx)
 		resultP, err = sessionService.StoreSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
 		if err != nil {
-			log.Println("! CRITICAL " + err.Error())
 			return err
 		}
 		sessionModelP := resultP.(*model.Session)
@@ -69,7 +66,6 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 		userService = service.NewUserService(tx)
 		_, err = userService.UpdateUserActiveSessionAndToken(&userModelP.Id, &sessionModelP.Id, ulidP)
 		if err != nil {
-			log.Println("! CRITICAL " + err.Error())
 			return err
 		}
 
@@ -77,7 +73,6 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 		if userModelP.LastSessionId != nil {
 			_, err = sessionService.EndSession(userModelP.LastSessionId)
 			if err != nil {
-				log.Println("! CRITICAL " + err.Error())
 				return err
 			}
 		}
