@@ -20,6 +20,7 @@ func UnsetTx() {
 
 type SessionService interface {
 	GetSession(sessionIdP *uint) (any, error)
+	GetUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error)
 	StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (any, error)
 	RefreshSession(sessionIdP *uint, userIdP *uint, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) (any, error)
 	EndSession(sessionIdP *uint) (any, error)
@@ -92,4 +93,14 @@ func (s *baseService) EndSession(sessionIdP *uint) (any, error) {
 	}
 
 	return nil, nil
+}
+
+func (s *baseService) GetUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error) {
+	sessionRepo := repository.NewSessionRepository(s.tx)
+	sessionArrayP, err := sessionRepo.FindUserSessions(userIdP, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return sessionArrayP, nil
 }

@@ -57,9 +57,11 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 	for result := range statusResults {
 		totalStatusResults += result
 	}
-	if totalStatusResults-209 == 400 {
+
+	if totalStatusResults-209 != 400 {
 		return nil, fiber.NewError(422, "Can't Refresh: Jwt token hasn't been expired yet")
 	}
+
 	/**
 	 * total should be 609 indecates that we received
 	 * 401 - 1 = 400 from Jwt Verification

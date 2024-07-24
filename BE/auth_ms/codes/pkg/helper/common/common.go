@@ -130,7 +130,7 @@ func ParseHeader(ctx *fiber.Ctx, param string, defaultValue string) (string, map
 	return "", ctx.GetReqHeaders()
 }
 
-func ProcessPageAndSize(ctx *fiber.Ctx) (int, int) {
+func ProcessPageAndSize(ctx *fiber.Ctx) (*int, *int, *int) {
 	pageStrVal, _ := ParseQueryParams(ctx, "page", "1")
 	sizeStrVal, _ := ParseQueryParams(ctx, "per_page", "10")
 
@@ -144,17 +144,18 @@ func ProcessPageAndSize(ctx *fiber.Ctx) (int, int) {
 		sizeIntVal = 10
 	}
 
-	return pageIntVal, sizeIntVal
+	offset := sizeIntVal * (pageIntVal - 1)
+
+	return &pageIntVal, &sizeIntVal, &offset
 }
 
 func CurrentUrl(ctx *fiber.Ctx) string {
 	return ctx.Protocol() + "://" + ctx.Hostname() + ctx.Path()
 }
 
-func PaginateResponse(searchKey string, forList bool, currentUrl string, currentPage int, size int, data any, total int) *response.GenericServiceResponseDto {
-	currentUrl = currentUrl + "?key=" + searchKey
+func PaginateResponse(searchKey string, currentUrl string, currentPage int, size int, data any, total int) *response.GenericServiceResponseDto {
 	total, from := total, (size*(currentPage-1))+1
-	to, prevPage, nextPage, lastPage := from+size, currentPage-1, currentPage+1, int(math.Ceil(float64(total)/float64(size)))
+	to, prevPage, nextPage, lastPage := from+size-1, currentPage-1, currentPage+1, int(math.Ceil(float64(total)/float64(size)))
 
 	if to > total {
 		to = total
@@ -174,16 +175,12 @@ func PaginateResponse(searchKey string, forList bool, currentUrl string, current
 		nextPage = 0
 	}
 
-	var meta string
-	var metaMap, linksMap map[string]any
-
-	if forList {
-		meta = fmt.Sprintf(`{"path":"%s","current_page":%d,"from":%d,"last_page":%d,"limit":%d,"to":%d,"total":%d}`, currentUrl, currentPage, from, lastPage, size, to, total)
-	} else {
-		topSearch := `[{"id":1,"key":"internet-pack","value":"Internet Pack","priority":1},{"id":2,"key":"monthly_pack","value":"monthly pack","priority":2}]`
-		meta = fmt.Sprintf(`{"top_search":%s, "pagination":{"current_page":%d,"from":%d,"last_page":%d,"limit":%d,"to":%d,"total":%d}}`, topSearch, currentPage, from, lastPage, size, to, total)
+	if searchKey != "" {
+		currentUrl = currentUrl + "?key=" + searchKey
 	}
 
+	var metaMap, linksMap map[string]any
+	meta := fmt.Sprintf(`{"path":"%s","current_page":%d,"from":%d,"last_page":%d,"limit":%d,"to":%d,"total":%d}`, currentUrl, currentPage, from, lastPage, size, to, total)
 	links := fmt.Sprintf(`{"first":"%s&page=%d&per_page=%d","last":"%s&page=%d&per_page=%d","next":"%s&page=%d&per_page=%d","prev":"%s&page=%d&per_page=%d"}`, currentUrl, 1, size, currentUrl, lastPage, size, currentUrl, nextPage, size, currentUrl, prevPage, size)
 	json.Unmarshal([]byte(meta), &metaMap)
 	json.Unmarshal([]byte(links), &linksMap)
