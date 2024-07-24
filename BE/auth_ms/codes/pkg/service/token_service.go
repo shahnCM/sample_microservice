@@ -2,24 +2,36 @@ package service
 
 import (
 	"auth_ms/pkg/dto"
-	"auth_ms/pkg/dto/response"
 	"auth_ms/pkg/enum"
 	"auth_ms/pkg/model"
 	"auth_ms/pkg/repository"
 	"time"
+
+	"gorm.io/gorm"
 )
 
-func GetToken(tokenIdP *string) (*response.GenericServiceResponseDto, error) {
-	tokenRepo := repository.NewTokenRepository()
-	token, err := tokenRepo.FindToken(tokenIdP)
-	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
-	}
-
-	return &response.GenericServiceResponseDto{StatusCode: 200, Data: token}, nil
+type TokenService interface {
 }
 
-func StoreToken(userIdP *uint, sessionIdP *uint, ulidP *string, tokenDataP *dto.TokenDataDto) (*response.GenericServiceResponseDto, error) {
+func NewTokenService(newTx *gorm.DB) TokenService {
+	if tx != nil {
+		return &baseService{tx: newTx}
+	}
+
+	return &baseService{tx: nil}
+}
+
+func (s *baseService) GetToken(tokenIdP *string) (any, error) {
+	tokenRepo := repository.NewTokenRepository(s.tx)
+	token, err := tokenRepo.FindToken(tokenIdP)
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
+}
+
+func (s *baseService) StoreToken(userIdP *uint, sessionIdP *uint, ulidP *string, tokenDataP *dto.TokenDataDto) (any, error) {
 	tokenModelP := &model.Token{
 		Id:               ulidP,
 		UserId:           userIdP,
@@ -31,21 +43,21 @@ func StoreToken(userIdP *uint, sessionIdP *uint, ulidP *string, tokenDataP *dto.
 		RefreshToken:     tokenDataP.Refresh.Token,
 	}
 
-	tokenRepo := repository.NewTokenRepository()
+	tokenRepo := repository.NewTokenRepository(s.tx)
 	err := tokenRepo.SaveToken(tokenModelP)
 	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 422, Data: nil}, err
+		return nil, err
 	}
 
-	return &response.GenericServiceResponseDto{StatusCode: 201, Data: tokenModelP}, nil
+	return tokenModelP, nil
 }
 
-func UpdateTokenStatus(tokenIdP *string, tokenStatus string) (*response.GenericServiceResponseDto, error) {
-	tokenRepo := repository.NewTokenRepository()
+func (s *baseService) UpdateTokenStatus(tokenIdP *string, tokenStatus string) (any, error) {
+	tokenRepo := repository.NewTokenRepository(s.tx)
 	err := tokenRepo.UpdateTokenStatus(tokenIdP, tokenStatus)
 	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 422, Data: nil}, err
+		return nil, err
 	}
 
-	return &response.GenericServiceResponseDto{StatusCode: 204, Data: nil}, nil
+	return nil, nil
 }

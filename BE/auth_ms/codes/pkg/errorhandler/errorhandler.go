@@ -2,7 +2,6 @@ package errorhandler
 
 import (
 	"auth_ms/pkg/helper/common"
-	"auth_ms/pkg/provider/database/mariadb10"
 	"errors"
 	"log"
 
@@ -11,7 +10,6 @@ import (
 
 func CustomFiberErrorHandler(ctx *fiber.Ctx, err error) error {
 
-	mariadb10.TransactionRollback()
 	log.Println("CustomeFiberErrorHandler recovered from panic: ")
 
 	// Status code defaults to 500

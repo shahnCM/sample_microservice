@@ -3,7 +3,6 @@ package mariadb10
 import (
 	"auth_ms/pkg/config"
 	"auth_ms/pkg/driver"
-	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -11,9 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var txMode bool = false
 var db *gorm.DB
-var dbOg *gorm.DB
 var once sync.Once
 
 func ConnectToMariaDb10() error {
@@ -46,7 +43,6 @@ func ConnectToMariaDb10() error {
 		connectError = nil
 
 		db, err = mariaDb10river.Connect(dsn)
-		dbOg = db
 
 		if err != nil {
 			connectError = err
@@ -69,40 +65,4 @@ func ConnectToMariaDb10() error {
 
 func GetMariaDb10() *gorm.DB {
 	return db
-}
-
-func TransactionBegin() *gorm.DB {
-	txMode = true
-	db = db.Begin()
-	log.Println("DB Transaction Begin")
-	return db
-}
-
-func TransactionCommit() *gorm.DB {
-	if txMode {
-		db.Commit()
-		log.Println("DB Transaction Commit")
-		TxModeOff()
-	}
-	return db
-}
-
-func TransactionRollback() *gorm.DB {
-	if txMode {
-		db.Rollback()
-		log.Println("DB Transaction Rollback")
-		TxModeOff()
-	}
-	return db
-}
-
-func TxModeOff() *gorm.DB {
-	txMode = false
-	db = dbOg
-	log.Println("DB Transaction Off")
-	return db
-}
-
-func TxModeIsOn() bool {
-	return txMode
 }

@@ -2,74 +2,91 @@ package service
 
 import (
 	"auth_ms/pkg/dto/request"
-	"auth_ms/pkg/dto/response"
 	"auth_ms/pkg/enum"
 	"auth_ms/pkg/model"
 	"auth_ms/pkg/repository"
+
+	"gorm.io/gorm"
 )
 
-func GetUserById(userIdP *uint) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository()
+type UserService interface {
+	GetUserById(userIdP *uint) (any, error)
+	GetUser(userP *request.UserLoginDto) (any, error)
+	StoreUser(userP *request.UserRegistrationDto) (any, error)
+	UpdateUserActiveToken(userIdP *uint, tokenIdP *string) (any, error)
+	UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (any, error)
+}
+
+func NewUserService(newTx *gorm.DB) UserService {
+	if tx != nil {
+		return &baseService{tx: newTx}
+	}
+
+	return &baseService{tx: nil}
+}
+
+func (s *baseService) GetUserById(userIdP *uint) (any, error) {
+	userRepo := repository.NewUserRepository(s.tx)
 	user, err := userRepo.FindUserById(userIdP)
 	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
+		return nil, err
 	}
 
-	return &response.GenericServiceResponseDto{StatusCode: 200, Data: user}, nil
+	return user, nil
 }
 
-func GetUser(userP *request.UserLoginDto) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository()
+func (s *baseService) GetUser(userP *request.UserLoginDto) (any, error) {
+	userRepo := repository.NewUserRepository(s.tx)
 	user, err := userRepo.FindUser(userP.Username)
 	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 404, Data: nil}, err
+		return nil, err
 	}
 
-	return &response.GenericServiceResponseDto{StatusCode: 200, Data: user}, nil
+	return user, nil
 }
 
-func StoreUser(userP *request.UserRegistrationDto) (*response.GenericServiceResponseDto, error) {
+func (s *baseService) StoreUser(userP *request.UserRegistrationDto) (any, error) {
 	userModelP := &model.User{
-		Username:      userP.Username,
-		Email:         userP.Email,
-		Password:      userP.Password,
-		Role:          enum.STANDARD,
-		LastSessionId: nil,
-		LastTokenId:   nil,
+		Username:            userP.Username,
+		Email:               userP.Email,
+		Password:            userP.Password,
+		Role:                enum.STANDARD,
+		LastSessionId:       nil,
+		SessionTokenTraceId: nil,
 	}
 
-	userRepo := repository.NewUserRepository()
+	userRepo := repository.NewUserRepository(s.tx)
 	err := userRepo.SaveUser(userModelP)
 	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 422, Data: nil}, err
+		return nil, err
 	}
 
-	return &response.GenericServiceResponseDto{StatusCode: 201, Data: userModelP}, nil
+	return userModelP, nil
 }
 
-func UpdateUserActiveToken(userIdP *uint, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository()
+func (s *baseService) UpdateUserActiveToken(userIdP *uint, tokenIdP *string) (any, error) {
+	userRepo := repository.NewUserRepository(s.tx)
 	updatesP := &map[string]any{
-		"last_token_id": tokenIdP,
+		"session_token_trace_id": tokenIdP,
 	}
 	err := userRepo.UpdateUser(userIdP, updatesP)
 	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 204, Data: nil}, err
+		return nil, err
 	}
 
-	return &response.GenericServiceResponseDto{StatusCode: 204, Data: nil}, nil
+	return nil, nil
 }
 
-func UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
-	userRepo := repository.NewUserRepository()
+func (s *baseService) UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (any, error) {
+	userRepo := repository.NewUserRepository(s.tx)
 	updatesP := &map[string]any{
-		"last_session_id": sessionIdP,
-		"last_token_id":   tokenIdP,
+		"last_session_id":        sessionIdP,
+		"session_token_trace_id": tokenIdP,
 	}
 	err := userRepo.UpdateUser(userIdP, updatesP)
 	if err != nil {
-		return &response.GenericServiceResponseDto{StatusCode: 204, Data: nil}, err
+		return nil, err
 	}
 
-	return &response.GenericServiceResponseDto{StatusCode: 204, Data: nil}, nil
+	return nil, nil
 }

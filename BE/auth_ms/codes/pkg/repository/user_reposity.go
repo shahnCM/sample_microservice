@@ -3,9 +3,7 @@ package repository
 import (
 	"auth_ms/pkg/model"
 	"auth_ms/pkg/provider/database/mariadb10"
-	"errors"
 
-	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +14,10 @@ type UserRepository interface {
 	SaveUser(user *model.User) error
 }
 
-func NewUserRepository() UserRepository {
+func NewUserRepository(tx *gorm.DB) UserRepository {
+	if tx != nil {
+		return &baseRepository{db: tx}
+	}
 	db := mariadb10.GetMariaDb10()
 	return &baseRepository{db: db}
 }
@@ -30,9 +31,6 @@ func (r *baseRepository) FindUserById(userIdP *uint) (*model.User, error) {
 		}).
 		Where("id = ?", userIdP).
 		First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fiber.ErrNotFound
-		}
 		return nil, err
 	}
 	return &user, nil
@@ -47,9 +45,6 @@ func (r *baseRepository) FindUser(identifier string) (*model.User, error) {
 		}).
 		Where("username = ? OR email = ?", identifier, identifier).
 		First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fiber.ErrNotFound
-		}
 		return nil, err
 	}
 	return &user, nil
