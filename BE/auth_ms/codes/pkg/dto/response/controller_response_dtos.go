@@ -25,6 +25,7 @@ type ValidationErrorElementDto struct {
 	Msg                  string `json:"msg"`
 	FailedField          string `json:"failed_field"`
 	FailedFieldInputType string `json:"failed_field_input_type"`
+	FailedFieldReason    string `json:"failed_field_reason"`
 	// Tag         string `json:"tag"`
 	// Value       string `json:"value"`
 }

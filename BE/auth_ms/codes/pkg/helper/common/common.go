@@ -71,9 +71,11 @@ func ValidateRequest(data any) []*response.ValidationErrorElementDto {
 
 			failedField := strcase.ToSnake(err.StructField())
 			failedFieldInputType := err.Type().String()
+			failedFieldReason := err.Tag()
 
 			element.Msg = fmt.Sprintf(`%s, %s: %s`, failedField, err.Tag(), value)
 			element.FailedField = failedField
+			element.FailedFieldReason = failedFieldReason
 			element.FailedFieldInputType = failedFieldInputType
 
 			errors = append(errors, &element)

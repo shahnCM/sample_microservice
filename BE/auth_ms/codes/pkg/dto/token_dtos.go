@@ -15,3 +15,8 @@ type RefreshTokenDto struct {
 	Type  string  `json:"type"`
 	Token *string `json:"token"`
 }
+
+type UserTokenDataDto struct {
+	*TokenDataDto
+	User any `json:"user"`
+}
