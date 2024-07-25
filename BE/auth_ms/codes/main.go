@@ -5,7 +5,6 @@ import (
 	"auth_ms/pkg/helper/safeasync"
 	"auth_ms/pkg/migration"
 	"auth_ms/pkg/provider/database/mariadb10"
-	"auth_ms/pkg/queue"
 	"auth_ms/pkg/route"
 	"log"
 	"os"
@@ -25,11 +24,11 @@ func main() {
 		log.Println("Loaded .env file")
 	}
 
-	if err := queue.Init(); err != nil {
-		log.Printf("Failed to initialize RabbitMQ queue: %v", err)
-	} else {
-		log.Println("Connected to RabbitMQ")
-	}
+	// if err := queue.Init(); err != nil {
+	// 	log.Printf("Failed to initialize RabbitMQ queue: %v", err)
+	// } else {
+	// 	log.Println("Connected to RabbitMQ")
+	// }
 
 	if err := mariadb10.ConnectToMariaDb10(); err != nil {
 		log.Printf("Failed to initialize Database: %v", err)
