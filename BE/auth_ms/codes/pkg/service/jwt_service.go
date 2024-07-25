@@ -107,7 +107,7 @@ func generateRefreshToken(claimsP *Claims) (*string, *int64, error) {
 
 	encodedClaims := base64URLEncode(&claimsJSON)
 
-	signature := hmacSHA256(encodedClaims, &config.GetJwtConfig().JwtSecret)
+	signature := hmacSHA256(encodedClaims, &config.GetJwtConfig().RefreshSecret)
 	refreshToken := *encodedClaims + "." + *signature
 
 	return &refreshToken, &expirationTimeUnix, nil
@@ -200,7 +200,7 @@ func VerifyRefreshToken(token *string) (*response.GenericServiceResponseDto, err
 	encodedClaims := parts[0]
 	providedSignature := parts[1]
 
-	expectedSignature := hmacSHA256(&encodedClaims, &config.GetJwtConfig().JwtSecret)
+	expectedSignature := hmacSHA256(&encodedClaims, &config.GetJwtConfig().RefreshSecret)
 
 	if providedSignature != *expectedSignature {
 		return nil, fmt.Errorf("invalid token signature")
