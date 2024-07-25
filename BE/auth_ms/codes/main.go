@@ -8,6 +8,7 @@ import (
 	"auth_ms/pkg/route"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -23,6 +24,13 @@ func main() {
 	} else {
 		log.Println("Loaded .env file")
 	}
+
+	timeZone := os.Getenv("APP_TIMEZONE")
+	localTimeZone, err := time.LoadLocation(timeZone)
+	if err != nil {
+		log.Fatalf("Must set APP_TIMEZONE in .env: %v", err)
+	}
+	time.Local = localTimeZone
 
 	// if err := queue.Init(); err != nil {
 	// 	log.Printf("Failed to initialize RabbitMQ queue: %v", err)
