@@ -1,4 +1,16 @@
-# Api Docs
+## Installation
+
+### Authentication Service
+
+- clone the repo
+- go to dir: `BE/auth_ms/codes`
+- rename example.env to .env
+- configure environment properly
+- run `go mod tidy` in cli
+- run `go run main.go`
+- This app will run on `localhost:<port>`
+
+## Api Docs
 
 ### Authentication Service
 

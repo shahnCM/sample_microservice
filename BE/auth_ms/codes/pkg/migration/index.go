@@ -10,7 +10,7 @@ import (
 func RunMigration() {
 	runMigration := os.Getenv("RUN_MIGRATION")
 
-	if runMigration == "true" {
+	if runMigration == "TRUE" {
 		db := mariadb10.GetMariaDb10()
 
 		if err := db.AutoMigrate(&model.User{}, &model.Session{}, &model.Token{}); err != nil {
