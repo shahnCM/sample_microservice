@@ -4,7 +4,6 @@ import (
 	"auth_ms/pkg/dto"
 	"auth_ms/pkg/dto/request"
 	"auth_ms/pkg/helper/common"
-	"auth_ms/pkg/model"
 	"auth_ms/pkg/provider/database/mariadb10"
 	"auth_ms/pkg/service"
 	"log"
@@ -18,12 +17,11 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 
 	// Verify Username
 	userService := service.NewUserService(nil)
-	resultP, err := userService.GetUser(userLoginReqP)
+	userModelP, err := userService.GetUser(userLoginReqP)
 	if err != nil {
 		log.Println(err)
 		return nil, fiber.ErrUnauthorized
 	}
-	userModelP := resultP.(*model.User)
 
 	// Compare password
 	if !common.CompareHash(&userModelP.Password, &userLoginReqP.Password) {
@@ -53,14 +51,13 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 		return nil, fiber.ErrInternalServerError
 	}
 
-	func() error {
+	err = func() error {
 		// Create a New Associated Session
 		sessionService := service.NewSessionService(tx)
-		resultP, err = sessionService.StoreSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
+		sessionModelP, err := sessionService.StoreSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
 		if err != nil {
 			return err
 		}
-		sessionModelP := resultP.(*model.Session)
 
 		// Update user with new session id and new token id
 		userService = service.NewUserService(tx)

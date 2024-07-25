@@ -10,8 +10,8 @@ import (
 )
 
 type UserService interface {
-	GetUserById(userIdP *uint, lockForUpdate bool) (any, error)
-	GetUser(userP *request.UserLoginDto) (any, error)
+	GetUserById(userIdP *uint, lockForUpdate bool) (*model.User, error)
+	GetUser(userP *request.UserLoginDto) (*model.User, error)
 	StoreUser(userP *request.UserRegistrationDto) (any, error)
 	UpdateUserActiveToken(userModelP *model.User, tokenIdP *string) (any, error)
 	UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (any, error)
@@ -25,7 +25,7 @@ func NewUserService(newTx *gorm.DB) UserService {
 	return &baseService{tx: nil}
 }
 
-func (s *baseService) GetUserById(userIdP *uint, lockForUpdate bool) (any, error) {
+func (s *baseService) GetUserById(userIdP *uint, lockForUpdate bool) (*model.User, error) {
 	var userModelP *model.User
 	var err error
 
@@ -44,7 +44,7 @@ func (s *baseService) GetUserById(userIdP *uint, lockForUpdate bool) (any, error
 	return userModelP, nil
 }
 
-func (s *baseService) GetUser(userP *request.UserLoginDto) (any, error) {
+func (s *baseService) GetUser(userP *request.UserLoginDto) (*model.User, error) {
 	userRepo := repository.NewUserRepository(s.tx)
 	user, err := userRepo.FindUser(userP.Username)
 	if err != nil {

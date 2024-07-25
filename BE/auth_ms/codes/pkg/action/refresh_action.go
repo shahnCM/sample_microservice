@@ -4,7 +4,6 @@ import (
 	"auth_ms/pkg/dto"
 	"auth_ms/pkg/helper/common"
 	"auth_ms/pkg/helper/safeasync"
-	"auth_ms/pkg/model"
 	"auth_ms/pkg/provider/database/mariadb10"
 	"auth_ms/pkg/service"
 	"log"
@@ -87,11 +86,10 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 
 		// Getting User and Locking for Update
 		userService := service.NewUserService(tx)
-		resultP, err := userService.GetUserById(&claims.UserId, true)
+		userModelP, err := userService.GetUserById(&claims.UserId, true)
 		if err != nil {
 			return nil, fiber.NewError(404, "Invalid Refresh/Jwt token: User not found")
 		}
-		userModelP := resultP.(*model.User)
 
 		// Check if user's active token_id exists as there's any active session running
 		if userModelP.SessionTokenTraceId == nil {
@@ -105,11 +103,10 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 
 		// Getting Session and Locking for Update
 		sessionService := service.NewSessionService(tx)
-		resultP, err = sessionService.GetSession(&userModelP.LastSession.Id, true)
+		sessionModelP, err := sessionService.GetSession(&userModelP.LastSession.Id, true)
 		if err != nil {
 			return nil, fiber.NewError(404, "Invalid Refresh/Jwt token: User session not found")
 		}
-		sessionModelP := resultP.(*model.Session)
 
 		// Hashing sessionTokenTraceId
 		hashedUlid, err := common.GenerateHash(userModelP.SessionTokenTraceId)

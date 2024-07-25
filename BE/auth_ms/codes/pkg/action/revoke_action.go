@@ -3,7 +3,6 @@ package action
 import (
 	"auth_ms/pkg/helper/common"
 	"auth_ms/pkg/helper/safeasync"
-	"auth_ms/pkg/model"
 	"auth_ms/pkg/provider/database/mariadb10"
 	"auth_ms/pkg/service"
 	"log"
@@ -32,11 +31,10 @@ func Revoke(jwtToken *string) *fiber.Error {
 
 			// Fetch user by user_id
 			userService := service.NewUserService(tx)
-			resultP, err := userService.GetUserById(&claims.UserId, false)
+			userModelP, err := userService.GetUserById(&claims.UserId, false)
 			if err != nil {
 				return fiber.ErrUnauthorized
 			}
-			userModelP := resultP.(*model.User)
 
 			if userModelP.SessionTokenTraceId == nil || !common.CompareHash(claims.TokenId, userModelP.SessionTokenTraceId) {
 				return fiber.ErrUnauthorized

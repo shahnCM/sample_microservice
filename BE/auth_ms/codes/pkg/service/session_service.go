@@ -9,10 +9,10 @@ import (
 )
 
 type SessionService interface {
-	GetSession(sessionIdP *uint, lockForUpdate bool) (any, error)
+	GetSession(sessionIdP *uint, lockForUpdate bool) (*model.Session, error)
 	GetUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error)
 	EndSession(sessionIdP *uint) (any, error)
-	StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (any, error)
+	StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*model.Session, error)
 	RefreshSession(sessionModelP *model.Session, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) error
 }
 
@@ -24,7 +24,7 @@ func NewSessionService(newTx *gorm.DB) SessionService {
 	return &baseService{tx: nil}
 }
 
-func (s *baseService) GetSession(sessionIdP *uint, lockForUpdate bool) (any, error) {
+func (s *baseService) GetSession(sessionIdP *uint, lockForUpdate bool) (*model.Session, error) {
 	sessionRepo := repository.NewSessionRepository(s.tx)
 
 	var sessionModelP *model.Session
@@ -43,7 +43,7 @@ func (s *baseService) GetSession(sessionIdP *uint, lockForUpdate bool) (any, err
 	return sessionModelP, nil
 }
 
-func (s *baseService) StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (any, error) {
+func (s *baseService) StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*model.Session, error) {
 	sessionModelP := &model.Session{
 		UserId:              userIdP,
 		StartsAt:            time.Now(),
