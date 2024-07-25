@@ -22,7 +22,7 @@ func Verify(jwtToken *string) (any, *fiber.Error) {
 
 	// Fetch user by user_id from claims
 	userService := service.NewUserService(nil)
-	resultP, err := userService.GetUserById(&claims.UserId)
+	resultP, err := userService.GetUserById(&claims.UserId, false)
 	if err != nil {
 		return nil, fiber.NewError(401, "Invalid Jwt token")
 	}

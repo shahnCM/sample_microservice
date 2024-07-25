@@ -32,7 +32,7 @@ func Revoke(jwtToken *string) *fiber.Error {
 
 			// Fetch user by user_id
 			userService := service.NewUserService(tx)
-			resultP, err := userService.GetUserById(&claims.UserId)
+			resultP, err := userService.GetUserById(&claims.UserId, false)
 			if err != nil {
 				return fiber.ErrUnauthorized
 			}

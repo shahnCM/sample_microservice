@@ -8,40 +8,39 @@ import (
 	"gorm.io/gorm"
 )
 
-var tx *gorm.DB = nil
-
-func SetTx(newtx *gorm.DB) {
-	tx = newtx
-}
-
-func UnsetTx() {
-	tx = nil
-}
-
 type SessionService interface {
-	GetSession(sessionIdP *uint) (any, error)
+	GetSession(sessionIdP *uint, lockForUpdate bool) (any, error)
 	GetUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error)
-	StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (any, error)
-	RefreshSession(sessionIdP *uint, userIdP *uint, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) (any, error)
 	EndSession(sessionIdP *uint) (any, error)
+	StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (any, error)
+	RefreshSession(sessionModelP *model.Session, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) error
 }
 
 func NewSessionService(newTx *gorm.DB) SessionService {
-	if tx != nil {
+	if newTx != nil {
 		return &baseService{tx: newTx}
 	}
 
 	return &baseService{tx: nil}
 }
 
-func (s *baseService) GetSession(sessionIdP *uint) (any, error) {
+func (s *baseService) GetSession(sessionIdP *uint, lockForUpdate bool) (any, error) {
 	sessionRepo := repository.NewSessionRepository(s.tx)
-	sessionP, err := sessionRepo.FindSession(sessionIdP)
+
+	var sessionModelP *model.Session
+	var err error
+
+	if lockForUpdate {
+		sessionModelP, err = sessionRepo.FindSessionAndLockForUpdate(sessionIdP)
+	} else {
+		sessionModelP, err = sessionRepo.FindSession(sessionIdP)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return sessionP, nil
+	return sessionModelP, nil
 }
 
 func (s *baseService) StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (any, error) {
@@ -54,8 +53,8 @@ func (s *baseService) StoreSession(userIdP *uint, sessionTokenTraceIdP *string, 
 		RefreshCount:        0,
 	}
 
-	sessionRepo := repository.NewSessionRepository(tx)
-	err := sessionRepo.SaveSession(sessionModelP)
+	sessionRepo := repository.NewSessionRepository(s.tx)
+	err := sessionRepo.CreateSession(sessionModelP)
 	if err != nil {
 		return nil, err
 	}
@@ -63,25 +62,26 @@ func (s *baseService) StoreSession(userIdP *uint, sessionTokenTraceIdP *string, 
 	return sessionModelP, nil
 }
 
-func (s *baseService) RefreshSession(sessionIdP *uint, userIdP *uint, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) (any, error) {
+func (s *baseService) RefreshSession(
+	sessionModelP *model.Session, tokenIdP *string,
+	jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) error {
+
 	*refreshCount++
-	sessionRepo := repository.NewSessionRepository(tx)
-	updatesP := &map[string]any{
-		"session_token_trace_id": tokenIdP,
-		"ends_at":                time.Unix(*jwtExpiresAt, 0),
-		"refresh_ends_at":        time.Unix(*refreshExpiresAt, 0),
-		"refresh_count":          refreshCount,
-	}
-	err := sessionRepo.UpdateSession(sessionIdP, updatesP)
-	if err != nil {
-		return nil, err
+	sessionModelP.RefreshCount = *refreshCount
+	sessionModelP.SessionTokenTraceId = tokenIdP
+	sessionModelP.RefreshEndsAt = time.Unix(*refreshExpiresAt, 0)
+	sessionModelP.EndsAt = time.Unix(*jwtExpiresAt, 0)
+
+	sessionRepo := repository.NewSessionRepository(s.tx)
+	if err := sessionRepo.SaveSession(sessionModelP); err != nil {
+		return err
 	}
 
-	return nil, nil
+	return nil
 }
 
 func (s *baseService) EndSession(sessionIdP *uint) (any, error) {
-	sessionRepo := repository.NewSessionRepository(tx)
+	sessionRepo := repository.NewSessionRepository(s.tx)
 	updatesP := &map[string]interface{}{
 		"ends_at":         time.Now(),
 		"refresh_ends_at": time.Now(),

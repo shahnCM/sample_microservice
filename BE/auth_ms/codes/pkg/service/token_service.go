@@ -14,7 +14,7 @@ type TokenService interface {
 }
 
 func NewTokenService(newTx *gorm.DB) TokenService {
-	if tx != nil {
+	if newTx != nil {
 		return &baseService{tx: newTx}
 	}
 

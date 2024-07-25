@@ -10,29 +10,38 @@ import (
 )
 
 type UserService interface {
-	GetUserById(userIdP *uint) (any, error)
+	GetUserById(userIdP *uint, lockForUpdate bool) (any, error)
 	GetUser(userP *request.UserLoginDto) (any, error)
 	StoreUser(userP *request.UserRegistrationDto) (any, error)
-	UpdateUserActiveToken(userIdP *uint, tokenIdP *string) (any, error)
+	UpdateUserActiveToken(userModelP *model.User, tokenIdP *string) (any, error)
 	UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (any, error)
 }
 
 func NewUserService(newTx *gorm.DB) UserService {
-	if tx != nil {
+	if newTx != nil {
 		return &baseService{tx: newTx}
 	}
 
 	return &baseService{tx: nil}
 }
 
-func (s *baseService) GetUserById(userIdP *uint) (any, error) {
+func (s *baseService) GetUserById(userIdP *uint, lockForUpdate bool) (any, error) {
+	var userModelP *model.User
+	var err error
+
 	userRepo := repository.NewUserRepository(s.tx)
-	user, err := userRepo.FindUserById(userIdP)
+
+	if lockForUpdate {
+		userModelP, err = userRepo.FindUserByIdAndLockForUpdate(userIdP)
+	} else {
+		userModelP, err = userRepo.FindUserById(userIdP)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return user, nil
+	return userModelP, nil
 }
 
 func (s *baseService) GetUser(userP *request.UserLoginDto) (any, error) {
@@ -64,12 +73,11 @@ func (s *baseService) StoreUser(userP *request.UserRegistrationDto) (any, error)
 	return userModelP, nil
 }
 
-func (s *baseService) UpdateUserActiveToken(userIdP *uint, tokenIdP *string) (any, error) {
+func (s *baseService) UpdateUserActiveToken(userModelP *model.User, tokenIdP *string) (any, error) {
+
+	userModelP.SessionTokenTraceId = tokenIdP
 	userRepo := repository.NewUserRepository(s.tx)
-	updatesP := &map[string]any{
-		"session_token_trace_id": tokenIdP,
-	}
-	err := userRepo.UpdateUser(userIdP, updatesP)
+	err := userRepo.SaveUser(userModelP)
 	if err != nil {
 		return nil, err
 	}

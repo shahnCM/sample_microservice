@@ -5,12 +5,15 @@ import (
 	"auth_ms/pkg/provider/database/mariadb10"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SessionRepository interface {
 	FindSession(identifier *uint) (*model.Session, error)
+	FindSessionAndLockForUpdate(identifier *uint) (*model.Session, error)
 	FindUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error)
-	SaveSession(session *model.Session) error
+	CreateSession(sessionModelP *model.Session) error
+	SaveSession(sessionModelP *model.Session) error
 	UpdateSession(sessionIdP *uint, updates *map[string]any) error
 }
 
@@ -22,9 +25,28 @@ func NewSessionRepository(tx *gorm.DB) SessionRepository {
 	return &baseRepository{db: db}
 }
 
+func (r *baseRepository) SaveSession(sessionModelP *model.Session) error {
+	return r.db.Unscoped().Save(sessionModelP).Error
+}
+
+func (r *baseRepository) CreateSession(sessionModelP *model.Session) error {
+	return r.db.Unscoped().Create(sessionModelP).Error
+}
+
 func (r *baseRepository) FindSession(identifier *uint) (*model.Session, error) {
 	var session model.Session
 	if err := r.db.Unscoped().
+		Where("id = ?", identifier).
+		First(&session).Error; err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *baseRepository) FindSessionAndLockForUpdate(identifier *uint) (*model.Session, error) {
+	var session model.Session
+	if err := r.db.Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", identifier).
 		First(&session).Error; err != nil {
 		return nil, err
@@ -46,10 +68,6 @@ func (r *baseRepository) FindUserSessions(userIdP *string, limit, offset *int) (
 		return nil, err
 	}
 	return &sessionArray, nil
-}
-
-func (r *baseRepository) SaveSession(session *model.Session) error {
-	return r.db.Unscoped().Create(session).Error
 }
 
 func (r *baseRepository) UpdateSession(sessionIdP *uint, updatesP *map[string]any) error {

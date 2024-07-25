@@ -85,9 +85,9 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 
 	tokenDataP, err := func() (any, *fiber.Error) {
 
-		// check database renew session & token
+		// Getting User and Locking for Update
 		userService := service.NewUserService(tx)
-		resultP, err := userService.GetUserById(&claims.UserId)
+		resultP, err := userService.GetUserById(&claims.UserId, true)
 		if err != nil {
 			return nil, fiber.NewError(404, "Invalid Refresh/Jwt token: User not found")
 		}
@@ -103,6 +103,14 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 			return nil, fiber.NewError(422, "Invalid Refresh/Jwt token")
 		}
 
+		// Getting Session and Locking for Update
+		sessionService := service.NewSessionService(tx)
+		resultP, err = sessionService.GetSession(&userModelP.LastSession.Id, true)
+		if err != nil {
+			return nil, fiber.NewError(404, "Invalid Refresh/Jwt token: User session not found")
+		}
+		sessionModelP := resultP.(*model.Session)
+
 		// Hashing sessionTokenTraceId
 		hashedUlid, err := common.GenerateHash(userModelP.SessionTokenTraceId)
 		if err != nil {
@@ -117,16 +125,15 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 		tokenDataP := responseP.Data.(*dto.TokenDataDto)
 
 		// Update active Associated Session's tokenId, jwtExpiresAt, refreshExpiresAt, refreshCount
-		sessionService := service.NewSessionService(tx)
-		_, err = sessionService.RefreshSession(
-			userModelP.LastSessionId, &userModelP.Id, userModelP.SessionTokenTraceId,
+		err = sessionService.RefreshSession(
+			sessionModelP, userModelP.SessionTokenTraceId,
 			tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp, &userModelP.LastSession.RefreshCount)
 		if err != nil {
 			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
 
 		// Update user with new sessionTokenTraceId
-		_, err = userService.UpdateUserActiveToken(&userModelP.Id, userModelP.SessionTokenTraceId)
+		_, err = userService.UpdateUserActiveToken(userModelP, userModelP.SessionTokenTraceId)
 		if err != nil {
 			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
