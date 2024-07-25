@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
@@ -82,7 +83,7 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 		return nil, fiber.ErrInternalServerError
 	}
 
-	tokenDataP, err := func() (any, *fiber.Error) {
+	tokenDataP, err := func(tx *gorm.DB) (any, *fiber.Error) {
 
 		// Getting User and Locking for Update
 		userService := service.NewUserService(tx)
@@ -122,21 +123,21 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 		tokenDataP := responseP.Data.(*dto.TokenDataDto)
 
 		// Update active Associated Session's tokenId, jwtExpiresAt, refreshExpiresAt, refreshCount
-		err = sessionService.RefreshSession(
+		if err = sessionService.RefreshSession(
 			sessionModelP, userModelP.SessionTokenTraceId,
-			tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp, &userModelP.LastSession.RefreshCount)
-		if err != nil {
+			tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp,
+			&userModelP.LastSession.RefreshCount); err != nil {
 			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
 
 		// Update user with new sessionTokenTraceId
-		_, err = userService.UpdateUserActiveToken(userModelP, userModelP.SessionTokenTraceId)
-		if err != nil {
+		if _, err = userService.UpdateUserActiveToken(
+			userModelP, userModelP.SessionTokenTraceId); err != nil {
 			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
 
 		return tokenDataP, nil
-	}()
+	}(tx)
 
 	if err != nil {
 		log.Println("ERROR: ", err.Error())

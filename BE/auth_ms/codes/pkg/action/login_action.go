@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.Error) {
@@ -51,7 +52,7 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 		return nil, fiber.ErrInternalServerError
 	}
 
-	err = func() error {
+	err = func(tx *gorm.DB) error {
 		// Create a New Associated Session
 		sessionService := service.NewSessionService(tx)
 		sessionModelP, err := sessionService.StoreSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
@@ -75,7 +76,7 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 		}
 
 		return nil
-	}()
+	}(tx)
 
 	if err != nil {
 		if err = tx.Rollback().Error; err != nil {
