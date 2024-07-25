@@ -1,75 +1,79 @@
-### Auth Microservice Database Schema
+### Auth Microservice High-Level Overview
 
-#### Users Table
+#### **Database Schema**
 
-- id: (primary key)
-- username: string (unique)
-- password_hash: string
-- email: string (unique)
-- role: enum ('standard', 'admin')
+- **Users Table**
+  - **id**: (primary key)
+  - **username**: string (unique)
+  - **password_hash**: string
+  - **email**: string (unique)
+  - **role**: enum ('standard', 'admin')
+  - **SessionTokenTraceId**: *string (unique, nullable)
+  - **LastSessionId**: *uint (unique, nullable)
+  - **LastSession**: *Session (foreign key)
 
-#### Sessions Table
+- **Sessions Table**
+  - **id**: (primary key)
+  - **user_id**: ULID (foreign key to users table)
+  - **session_token_trace_id**: *string (not null)
+  - **refresh_count**: integer
+  - **starts_at**: datetime (not null)
+  - **ends_at**: datetime (nullable)
+  - **revoked**: boolean
+  - **refresh_ends_at**: datetime
+  - **created_at**: datetime
+  - **updated_at**: datetime
 
-- id: (primary key)
-- user_id: ULID (foreign key to users table)
-- started_at: datetime
-- expires_at: datetime (nullable)
-- refresh_count: integer
 
-#### Tokens Table
+#### **Relations**
 
-- id: (primary key) ULID
-- user_id: (foreign key to users table)
-- session_id: (foreign key to sessions table)
-- jwt_token: string (Nullable)
-- refresh_token: string (Nullable)
-- issued_at: datetime
-- jwt_expires_at: datetime
-- refresh_expires_at: datetime
-- token_status: enum ('fresh', 'refreshed', 'revoked')
+- A **User** can have many **Sessions**.
+- A **Session** can have many **Tokens** (though tokens are not used directly in actions).
 
-#### Relations
+#### **Action Logics**
 
-- User has many Sessions (In terms of db relations)
-- Session has many Tokens (In terms of db relations)
+- **Register**: Hashes the password and stores the user information in the database.
 
-### Additional Notes
+- **Login**:
+  - Verifies username and password.
+  - Creates a new session and updates the user with the new session ID and token ID.
+  - Ends any previous active sessions.
 
-#### Token Issuing Logic
+- **Revoke**:
+  - Verifies the JWT token.
+  - Updates the associated session's `expires_at` to the current time.
+  - Marks the token's status as 'revoked'.
 
-- When a user has a running session, we cannot issue a new token/start a new session.
-- If a new token has to be issued/a new session needs to be started:
-  - current session needs to be ended
-  - current token has to be revoked
+- **Verify**:
+  - Verifies the JWT token and returns user information if valid.
 
-#### Token Refreshing Logic
+- **Refresh**:
+  - Verifies both JWT and refresh tokens concurrently.
+  - Ensures JWT token is expired and refresh token is valid.
+  - Checks consistency between JWT and refresh tokens.
+  - Locks user and session records for update.
+  - Generates new JWT and refresh tokens.
+  - Updates session with new token details and expiration times.
+  - Updates user with the new session token trace ID.
+  - Rolls back transaction on error and commits if successful.
 
-- When refreshing a token, ensure that the token's token_status is fresh.
-- A token can only be refreshed if the associated session's expires_at is null.
+#### **Microservices Architecture**
 
-#### Token Revocation
+- **Auth Microservice**: Handles authentication, token issuance, token refreshing, token revocation, and session management.
+- **IP Management Microservice**: Manages IP addresses and their associated labels/comments.
+- **Gateway Microservice**: Acts as the entry point for requests, routing them to the appropriate services.
 
-- Revoked tokens are marked with token_status set to revoked.
-- The associated session’s expires_at is updated to the current time.
+#### **Communication**
 
-#### User Roles
+- The auth microservice sends user action data to the log microservice through RabbitMQ.
 
-- Users have roles (standard, admin), and roles determine access control.
+#### **Endpoints**
 
-### Microservices Architecture
+- `/fresh`: Issues a new token.
+- `/refresh`: Refreshes an expired token.
+- `/revoke`: Revokes a token.
+- `/verify`: Verifies a token.
+- `/register`: Registers a new user.
+- `/sessions/users/:id`: Retrieves session details for a specific user (admin only).
 
-- **Auth Microservice:** Manages authentication, token issuance, token refreshing, token revocation, and session management.
-- **Log Microservice:** Receives and stores user action data sent from the auth microservice through RabbitMQ.
-- **IP Management Microservice:** Manages IP addresses and their associated labels/comments.
-- **Gateway Microservice:** Acts as the entry point for requests, routing them to the appropriate services.
 
-#### Communication
-
-- The auth microservice will send user action data to the log microservice through RabbitMQ.
-
-#### End Points
-
-- /fresh
-- /refresh
-- /revoke
-- /verify
