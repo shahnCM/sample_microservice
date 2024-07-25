@@ -10,9 +10,9 @@ import (
 func InitApiRoutes(app *fiber.App) {
 	app.Get("/health-check", controller.ServerAlive)
 
-	v1 := app.Group("/v1")
+	v1 := app.Group("auth/api/v1")
 
-	auth := v1.Group("/auth/token")
+	auth := v1.Group("/token")
 	auth.Post("/fresh", controller.FreshToken)
 	auth.Put("/revoke", controller.RevokeToken)
 	auth.Put("/verify", controller.VerifyToken)
