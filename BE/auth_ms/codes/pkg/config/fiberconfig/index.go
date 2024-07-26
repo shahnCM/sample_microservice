@@ -17,12 +17,13 @@ func FiberConfig() fiber.Config {
 	appName := os.Getenv("APP_NAME")
 	// Return Fiber configuration.
 	return fiber.Config{
-		AppName:       appName,
-		Prefork:       preforkEnabled,
-		CaseSensitive: true,
-		StrictRouting: true,
-		ReadTimeout:   time.Second * time.Duration(readTimeoutSecondsCount),
-		ErrorHandler:  errorhandler.CustomFiberErrorHandler,
+		AppName:               appName,
+		Prefork:               preforkEnabled,
+		CaseSensitive:         true,
+		StrictRouting:         true,
+		ReadTimeout:           time.Second * time.Duration(readTimeoutSecondsCount),
+		ErrorHandler:          errorhandler.CustomFiberErrorHandler,
+		DisableStartupMessage: true,
 	}
 }
 

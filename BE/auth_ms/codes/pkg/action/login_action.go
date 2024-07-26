@@ -20,7 +20,6 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 	userService := service.NewUserService(nil)
 	userModelP, err := userService.GetUser(userLoginReqP)
 	if err != nil {
-		log.Println(err)
 		return nil, fiber.ErrUnauthorized
 	}
 

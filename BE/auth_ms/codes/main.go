@@ -46,8 +46,13 @@ func main() {
 	}
 
 	app := fiber.New(fiberconfig.FiberConfig())
-	app.Use(logger.New(logger.Config{Format: "[${ip}]:${port} ${status} - ${method} ${path}\n"}))
 	app.Use(recover.New(fiberconfig.RecoveryConfig()))
+
+	app.Use(logger.New(logger.Config{
+		Format:     "[${time}] ${status} - ${latency} ${method} ${path}\n",
+		TimeFormat: "15:04:05",
+		TimeZone:   time.Local.String(),
+	}))
 
 	route.InitApiRoutes(app)
 

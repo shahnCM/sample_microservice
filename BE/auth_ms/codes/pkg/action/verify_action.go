@@ -11,20 +11,19 @@ func Verify(jwtToken *string) (any, *fiber.Error) {
 
 	// Verify token and get claims
 	responseP, err := service.VerifyJWT(jwtToken)
-	if err != nil || responseP.StatusCode != 200 {
+	if err != nil {
 		return nil, fiber.NewError(401, "Invalid Jwt token")
+	} else if responseP.StatusCode == 401 {
+		return nil, fiber.NewError(401, "Expired Jwt token")
 	}
 	claims := responseP.Data.(*service.Claims)
 
 	// Fetch user by user_id from claims
 	userService := service.NewUserService(nil)
-	userModelP, err := userService.GetUserById(&claims.UserId, false)
-	if err != nil {
-		return nil, fiber.NewError(401, "Invalid Jwt token")
-	}
-
-	// Check if user's active token_id matches with the claim's token_id
-	if userModelP.SessionTokenTraceId == nil || !common.CompareHash(claims.TokenId, userModelP.SessionTokenTraceId) {
+	userModelP, err := userService.GetUserByIdFast(&claims.UserId)
+	if err != nil ||
+		userModelP.SessionTokenTraceId == nil ||
+		!common.CompareHash(claims.TokenId, userModelP.SessionTokenTraceId) {
 		return nil, fiber.NewError(401, "Invalid Jwt token")
 	}
 

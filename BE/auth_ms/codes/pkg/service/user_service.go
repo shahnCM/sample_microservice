@@ -12,6 +12,7 @@ import (
 type UserService interface {
 	GetUserById(userIdP *uint, lockForUpdate bool) (*model.User, error)
 	GetUser(userP *request.UserLoginDto) (*model.User, error)
+	GetUserByIdFast(userIdP *uint) (*model.User, error)
 	StoreUser(userP *request.UserRegistrationDto) (any, error)
 	UpdateUserActiveToken(userModelP *model.User, tokenIdP *string) (any, error)
 	UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (any, error)
@@ -37,6 +38,16 @@ func (s *baseService) GetUserById(userIdP *uint, lockForUpdate bool) (*model.Use
 		userModelP, err = userRepo.FindUserById(userIdP)
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
+	return userModelP, nil
+}
+
+func (s *baseService) GetUserByIdFast(userIdP *uint) (*model.User, error) {
+	userRepo := repository.NewUserRepository(s.tx)
+	userModelP, err := userRepo.FindUserByIdFast(userIdP)
 	if err != nil {
 		return nil, err
 	}

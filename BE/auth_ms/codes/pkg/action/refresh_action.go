@@ -104,7 +104,7 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 
 		// Getting Session and Locking for Update
 		sessionService := service.NewSessionService(tx)
-		sessionModelP, err := sessionService.GetSession(&userModelP.LastSession.Id, true)
+		sessionModelP, err := sessionService.GetSession(userModelP.LastSessionId, true)
 		if err != nil {
 			return nil, fiber.NewError(404, "Invalid Refresh/Jwt token: User session not found")
 		}
