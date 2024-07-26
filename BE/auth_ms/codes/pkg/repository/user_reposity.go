@@ -45,9 +45,9 @@ func (r *baseRepository) FindUserById(userIdP *uint) (*model.User, error) {
 	var user model.User
 
 	if err := r.db.Unscoped().
-		Preload("LastSession", func(db *gorm.DB) *gorm.DB {
-			return db.Unscoped().Select("id", "refresh_count").Order("id DESC").Limit(1)
-		}).
+		// Preload("LastSession", func(db *gorm.DB) *gorm.DB {
+		// 	return db.Unscoped().Select("id", "refresh_count").Order("id DESC").Limit(1)
+		// }).
 		Where("id = ?", userIdP).
 		First(&user).Error; err != nil {
 		return nil, err
@@ -60,9 +60,9 @@ func (r *baseRepository) FindUserByIdAndLockForUpdate(userIdP *uint) (*model.Use
 
 	if err := r.db.Unscoped().
 		Clauses(clause.Locking{Strength: "UPDATE"}).
-		Preload("LastSession", func(db *gorm.DB) *gorm.DB {
-			return db.Unscoped().Select("id", "refresh_count").Order("id DESC").Limit(1)
-		}).
+		// Preload("LastSession", func(db *gorm.DB) *gorm.DB {
+		// 	return db.Unscoped().Select("id", "refresh_count").Order("id DESC").Limit(1)
+		// }).
 		Where("id = ?", userIdP).
 		First(&user).Error; err != nil {
 		return nil, err

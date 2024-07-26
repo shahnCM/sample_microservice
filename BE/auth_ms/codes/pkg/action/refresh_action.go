@@ -72,6 +72,7 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 	for result := range claimsResults {
 		claimsArr = append(claimsArr, result)
 	}
+	// Checking pair integrity of refresh and jwt token
 	if *claimsArr[0].TokenId != *claimsArr[1].TokenId {
 		return nil, fiber.NewError(422, "Invalid Refresh/Jwt token")
 	}
@@ -126,7 +127,7 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 		if err = sessionService.RefreshSession(
 			sessionModelP, userModelP.SessionTokenTraceId,
 			tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp,
-			&userModelP.LastSession.RefreshCount); err != nil {
+			&sessionModelP.RefreshCount); err != nil {
 			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
 
