@@ -14,8 +14,8 @@ func FreshToken(ctx *fiber.Ctx) error {
 
 	// Get Post Body
 	userLoginReqP := new(request.UserLoginDto)
-	if errBody, err := common.ParseRequestBody(ctx, userLoginReqP); errBody != nil {
-		return err
+	if validationError, validationErrorResponse := common.ParseRequestBody(ctx, userLoginReqP); validationError != nil {
+		return validationErrorResponse
 	}
 
 	tokenDataP, err := action.Login(userLoginReqP)
@@ -31,8 +31,8 @@ func RegisterUser(ctx *fiber.Ctx) error {
 
 	// Get Post Body
 	userP := new(request.UserRegistrationDto)
-	if errBody, err := common.ParseRequestBody(ctx, userP); errBody != nil {
-		return err
+	if validationError, validationErrorResponse := common.ParseRequestBody(ctx, userP); validationError != nil {
+		return validationErrorResponse
 	}
 	// Check password with confirm password
 	if userP.Password != userP.PasswordConfirm {
@@ -58,8 +58,8 @@ func RefreshToken(ctx *fiber.Ctx) error {
 
 	// Refresh Token from POST body
 	refreshTokenReqP := new(request.RefreshTokenDto)
-	if errBody, validateionErr := common.ParseRequestBody(ctx, refreshTokenReqP); errBody != nil {
-		return validateionErr
+	if validationError, validationErrorResponse := common.ParseRequestBody(ctx, refreshTokenReqP); validationError != nil {
+		return validationErrorResponse
 	}
 	refreshToken := *refreshTokenReqP.Token
 

@@ -3,22 +3,24 @@ package response
 type SuccessResponseDto struct {
 	Status     string `json:"status"`
 	StatusCode int    `json:"status_code"`
+	Message    string `json:"message"`
 	Data       any    `json:"data"`
 	Meta       any    `json:"meta"`
 	Links      any    `json:"links"`
 }
 
 type ErrorResponseDto struct {
-	Status       string `json:"status"`
-	StatusCode   int    `json:"status_code"`
-	ErrorMessage any    `json:"error_message"`
+	Status     string `json:"status"`
+	StatusCode int    `json:"status_code"`
+	Message    any    `json:"message"`
 }
 
 type ValidationErrorResponseDto struct {
-	Status           string                       `json:"status"`
-	StatusCode       int                          `json:"status_code"`
-	ErrorMessage     string                       `json:"error_message"`
-	ValidationErrors []*ValidationErrorElementDto `json:"validation_errors"`
+	Status           string                        `json:"status"`
+	StatusCode       int                           `json:"status_code"`
+	Message          string                        `json:"message"`
+	Errors           *map[string]*[]string         `json:"errors"`
+	ValidationErrors *[]*ValidationErrorElementDto `json:"validation_errors"`
 }
 
 type ValidationErrorElementDto struct {

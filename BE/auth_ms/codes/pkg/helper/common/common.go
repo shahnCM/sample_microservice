@@ -32,6 +32,7 @@ func SuccessResponse(ctx *fiber.Ctx, code int, data any, meta any, links any) er
 	return ctx.Status(code).JSON(&response.SuccessResponseDto{
 		Status:     "Success",
 		StatusCode: code,
+		Message:    "",
 		Data:       data,
 		Meta:       meta,
 		Links:      links,
@@ -40,26 +41,31 @@ func SuccessResponse(ctx *fiber.Ctx, code int, data any, meta any, links any) er
 
 func ErrorResponse(ctx *fiber.Ctx, code int, message any) error {
 	return ctx.Status(code).JSON(&response.ErrorResponseDto{
-		Status:       "Error",
-		StatusCode:   code,
-		ErrorMessage: message,
+		Status:     "Error",
+		StatusCode: code,
+		Message:    message,
 	})
 }
 
-func ValidationErrorResponse(ctx *fiber.Ctx, validationErrorElements []*response.ValidationErrorElementDto) error {
+func ValidationErrorResponse(ctx *fiber.Ctx,
+	validationErrors *[]*response.ValidationErrorElementDto,
+	simpleValidationErrors *map[string]*[]string) error {
 	return ctx.Status(422).JSON(&response.ValidationErrorResponseDto{
 		Status:           "Error",
 		StatusCode:       422,
-		ErrorMessage:     "Validation Error",
-		ValidationErrors: validationErrorElements,
+		Message:          "Validation Error",
+		Errors:           simpleValidationErrors,
+		ValidationErrors: validationErrors,
 	})
 }
 
-func ValidateRequest(data any) []*response.ValidationErrorElementDto {
+func ValidateRequest(data any) (*[]*response.ValidationErrorElementDto, *map[string]*[]string, error) {
 	var validate = validator.New()
-	var errors []*response.ValidationErrorElementDto
+	var simpleValidationErrors = make(map[string]*[]string)
+	var validationsErrors []*response.ValidationErrorElementDto
 
-	if err := validate.Struct(data); err != nil {
+	err := validate.Struct(data)
+	if err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
 
 			var element response.ValidationErrorElementDto
@@ -78,16 +84,17 @@ func ValidateRequest(data any) []*response.ValidationErrorElementDto {
 			element.FailedFieldReason = failedFieldReason
 			element.FailedFieldInputType = failedFieldInputType
 
-			errors = append(errors, &element)
+			validationsErrors = append(validationsErrors, &element)
+			simpleValidationErrors[failedField] = &[]string{element.Msg}
 		}
 	}
 
-	return errors
+	return &validationsErrors, &simpleValidationErrors, err
 }
 
 func ValidateRequestWithValidationErrorResponse(ctx *fiber.Ctx, data any) error {
-	if err := ValidateRequest(data); err != nil {
-		return ValidationErrorResponse(ctx, err)
+	if validationsErrors, simpleValidationErrors, err := ValidateRequest(data); err != nil {
+		return ValidationErrorResponse(ctx, validationsErrors, simpleValidationErrors)
 	}
 
 	return nil
@@ -97,12 +104,11 @@ func ParseRequestBody(ctx *fiber.Ctx, dto any) (any, error) {
 
 	bodyParserError := ctx.BodyParser(dto)
 
-	if validationError := ValidateRequest(dto); validationError != nil {
-		return validationError, ValidationErrorResponse(ctx, validationError)
+	if validationError, simpleValidationErrors, err := ValidateRequest(dto); err != nil {
+		return err, ValidationErrorResponse(ctx, validationError, simpleValidationErrors)
 	}
 
 	if bodyParserError != nil {
-		log.Println(bodyParserError)
 		return bodyParserError, ErrorResponse(ctx, 422, "Invalid Or Empty input: "+bodyParserError.Error())
 	}
 
