@@ -123,17 +123,11 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 		}
 		tokenDataP := responseP.Data.(*dto.TokenDataDto)
 
-		// Update active Associated Session's tokenId, jwtExpiresAt, refreshExpiresAt, refreshCount
+		// Update active Associated Session's SessionTokenTraceId, jwtExpiresAt, refreshExpiresAt, refreshCount
 		if err = sessionService.RefreshSession(
 			sessionModelP, userModelP.SessionTokenTraceId,
 			tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp,
 			&sessionModelP.RefreshCount); err != nil {
-			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
-		}
-
-		// Update user with new sessionTokenTraceId
-		if _, err = userService.UpdateUserActiveToken(
-			userModelP, userModelP.SessionTokenTraceId); err != nil {
 			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
 

@@ -5,17 +5,19 @@ import (
 	"auth_ms/pkg/enum"
 	"auth_ms/pkg/model"
 	"auth_ms/pkg/repository"
+	"log"
 
 	"gorm.io/gorm"
 )
 
 type UserService interface {
-	GetUserById(userIdP *uint, lockForUpdate bool) (*model.User, error)
-	GetUser(userP *request.UserLoginDto) (*model.User, error)
 	GetUserByIdFast(userIdP *uint) (*model.User, error)
-	StoreUser(userP *request.UserRegistrationDto) (any, error)
-	UpdateUserActiveToken(userModelP *model.User, tokenIdP *string) (any, error)
-	UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (any, error)
+	GetUserById(userIdP *uint, lockForUpdate bool) (*model.User, error)
+	GetUserByUsername(userP *request.UserLoginDto) (*model.User, error)
+	RegisterUser(userP *request.UserRegistrationDto) (any, error)
+	StartUserActiveSessionAndToken(userModelP *model.User, sessionId *uint, sessionTokenTraceId *string) (any, error)
+	UpdateUserActiveToken(userModelP *model.User, sessionTokenTraceId *string) (any, error)
+	EndUserActiveSessionAndToken(userModelP *model.User) (any, error)
 }
 
 func NewUserService(newTx *gorm.DB) UserService {
@@ -24,6 +26,16 @@ func NewUserService(newTx *gorm.DB) UserService {
 	}
 
 	return &baseService{tx: nil}
+}
+
+func (s *baseService) GetUserByIdFast(userIdP *uint) (*model.User, error) {
+	userRepo := repository.NewUserRepository(s.tx)
+	userModelP, err := userRepo.FindUserByIdFast(userIdP)
+	if err != nil {
+		return nil, err
+	}
+
+	return userModelP, nil
 }
 
 func (s *baseService) GetUserById(userIdP *uint, lockForUpdate bool) (*model.User, error) {
@@ -39,23 +51,14 @@ func (s *baseService) GetUserById(userIdP *uint, lockForUpdate bool) (*model.Use
 	}
 
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 
 	return userModelP, nil
 }
 
-func (s *baseService) GetUserByIdFast(userIdP *uint) (*model.User, error) {
-	userRepo := repository.NewUserRepository(s.tx)
-	userModelP, err := userRepo.FindUserByIdFast(userIdP)
-	if err != nil {
-		return nil, err
-	}
-
-	return userModelP, nil
-}
-
-func (s *baseService) GetUser(userP *request.UserLoginDto) (*model.User, error) {
+func (s *baseService) GetUserByUsername(userP *request.UserLoginDto) (*model.User, error) {
 	userRepo := repository.NewUserRepository(s.tx)
 	user, err := userRepo.FindUser(userP.Username)
 	if err != nil {
@@ -65,7 +68,7 @@ func (s *baseService) GetUser(userP *request.UserLoginDto) (*model.User, error) 
 	return user, nil
 }
 
-func (s *baseService) StoreUser(userP *request.UserRegistrationDto) (any, error) {
+func (s *baseService) RegisterUser(userP *request.UserRegistrationDto) (any, error) {
 	userModelP := &model.User{
 		Username:            userP.Username,
 		Email:               userP.Email,
@@ -76,7 +79,7 @@ func (s *baseService) StoreUser(userP *request.UserRegistrationDto) (any, error)
 	}
 
 	userRepo := repository.NewUserRepository(s.tx)
-	err := userRepo.SaveUser(userModelP)
+	err := userRepo.CreateUser(userModelP)
 	if err != nil {
 		return nil, err
 	}
@@ -84,11 +87,11 @@ func (s *baseService) StoreUser(userP *request.UserRegistrationDto) (any, error)
 	return userModelP, nil
 }
 
-func (s *baseService) UpdateUserActiveToken(userModelP *model.User, tokenIdP *string) (any, error) {
-
-	userModelP.SessionTokenTraceId = tokenIdP
+func (s *baseService) StartUserActiveSessionAndToken(userModelP *model.User, sessionId *uint, sessionTokenTraceId *string) (any, error) {
 	userRepo := repository.NewUserRepository(s.tx)
-	err := userRepo.SaveUser(userModelP)
+	userModelP.LastSessionId = sessionId
+	userModelP.SessionTokenTraceId = sessionTokenTraceId
+	err := userRepo.UpdateUser(userModelP)
 	if err != nil {
 		return nil, err
 	}
@@ -96,13 +99,22 @@ func (s *baseService) UpdateUserActiveToken(userModelP *model.User, tokenIdP *st
 	return nil, nil
 }
 
-func (s *baseService) UpdateUserActiveSessionAndToken(userIdP *uint, sessionIdP *uint, tokenIdP *string) (any, error) {
+func (s *baseService) UpdateUserActiveToken(userModelP *model.User, sessionTokenTraceId *string) (any, error) {
+	userModelP.SessionTokenTraceId = sessionTokenTraceId
 	userRepo := repository.NewUserRepository(s.tx)
-	updatesP := &map[string]any{
-		"last_session_id":        sessionIdP,
-		"session_token_trace_id": tokenIdP,
+	err := userRepo.UpdateUser(userModelP)
+	if err != nil {
+		return nil, err
 	}
-	err := userRepo.UpdateUser(userIdP, updatesP)
+
+	return nil, nil
+}
+
+func (s *baseService) EndUserActiveSessionAndToken(userModelP *model.User) (any, error) {
+	userRepo := repository.NewUserRepository(s.tx)
+	userModelP.LastSessionId = nil
+	userModelP.SessionTokenTraceId = nil
+	err := userRepo.UpdateUser(userModelP)
 	if err != nil {
 		return nil, err
 	}

@@ -9,11 +9,11 @@ import (
 )
 
 type SessionService interface {
-	GetSession(sessionIdP *uint, lockForUpdate bool) (*model.Session, error)
 	GetUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error)
+	GetSession(sessionIdP *uint, lockForUpdate bool) (*model.Session, error)
+	StartSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*model.Session, error)
+	RefreshSession(sessionModelP *model.Session, SessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) error
 	EndSession(sessionIdP *uint) (any, error)
-	StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*model.Session, error)
-	RefreshSession(sessionModelP *model.Session, tokenIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) error
 }
 
 func NewSessionService(newTx *gorm.DB) SessionService {
@@ -22,6 +22,16 @@ func NewSessionService(newTx *gorm.DB) SessionService {
 	}
 
 	return &baseService{tx: nil}
+}
+
+func (s *baseService) GetUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error) {
+	sessionRepo := repository.NewSessionRepository(s.tx)
+	sessionArrayP, err := sessionRepo.FindUserSessions(userIdP, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return sessionArrayP, nil
 }
 
 func (s *baseService) GetSession(sessionIdP *uint, lockForUpdate bool) (*model.Session, error) {
@@ -43,7 +53,7 @@ func (s *baseService) GetSession(sessionIdP *uint, lockForUpdate bool) (*model.S
 	return sessionModelP, nil
 }
 
-func (s *baseService) StoreSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*model.Session, error) {
+func (s *baseService) StartSession(userIdP *uint, sessionTokenTraceIdP *string, jwtExpiresAt *int64, refreshExpiresAt *int64) (*model.Session, error) {
 	sessionModelP := &model.Session{
 		UserId:              userIdP,
 		StartsAt:            time.Now(),
@@ -63,12 +73,12 @@ func (s *baseService) StoreSession(userIdP *uint, sessionTokenTraceIdP *string, 
 }
 
 func (s *baseService) RefreshSession(
-	sessionModelP *model.Session, tokenIdP *string,
+	sessionModelP *model.Session, SessionTokenTraceIdP *string,
 	jwtExpiresAt *int64, refreshExpiresAt *int64, refreshCount *int) error {
 
 	*refreshCount++
 	sessionModelP.RefreshCount = *refreshCount
-	sessionModelP.SessionTokenTraceId = tokenIdP
+	sessionModelP.SessionTokenTraceId = SessionTokenTraceIdP
 	sessionModelP.RefreshEndsAt = time.Unix(*refreshExpiresAt, 0)
 	sessionModelP.EndsAt = time.Unix(*jwtExpiresAt, 0)
 
@@ -93,14 +103,4 @@ func (s *baseService) EndSession(sessionIdP *uint) (any, error) {
 	}
 
 	return nil, nil
-}
-
-func (s *baseService) GetUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error) {
-	sessionRepo := repository.NewSessionRepository(s.tx)
-	sessionArrayP, err := sessionRepo.FindUserSessions(userIdP, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	return sessionArrayP, nil
 }

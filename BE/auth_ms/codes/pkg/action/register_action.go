@@ -18,7 +18,7 @@ func Register(userP *request.UserRegistrationDto) *fiber.Error {
 
 	// Store Username & Password
 	userService := service.NewUserService(nil)
-	_, err = userService.StoreUser(userP)
+	_, err = userService.RegisterUser(userP)
 	if err != nil {
 		// return common.ErrorResponse(ctx, fiber.ErrUnprocessableEntity.Code, strings.Split(err.Error(), ":")[1])
 		return fiber.NewError(422, err.Error())

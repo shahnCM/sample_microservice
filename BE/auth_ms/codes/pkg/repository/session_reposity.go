@@ -25,14 +25,6 @@ func NewSessionRepository(tx *gorm.DB) SessionRepository {
 	return &baseRepository{db: db}
 }
 
-func (r *baseRepository) SaveSession(sessionModelP *model.Session) error {
-	return r.db.Unscoped().Save(sessionModelP).Error
-}
-
-func (r *baseRepository) CreateSession(sessionModelP *model.Session) error {
-	return r.db.Unscoped().Create(sessionModelP).Error
-}
-
 func (r *baseRepository) FindSession(identifier *uint) (*model.Session, error) {
 	var session model.Session
 	if err := r.db.Unscoped().
@@ -68,6 +60,14 @@ func (r *baseRepository) FindUserSessions(userIdP *string, limit, offset *int) (
 		return nil, err
 	}
 	return &sessionArray, nil
+}
+
+func (r *baseRepository) CreateSession(sessionModelP *model.Session) error {
+	return r.db.Unscoped().Create(sessionModelP).Error
+}
+
+func (r *baseRepository) SaveSession(sessionModelP *model.Session) error {
+	return r.db.Unscoped().Save(sessionModelP).Error
 }
 
 func (r *baseRepository) UpdateSession(sessionIdP *uint, updatesP *map[string]any) error {

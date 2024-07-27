@@ -41,7 +41,7 @@ func Revoke(jwtToken *string) *fiber.Error {
 			}
 
 			// Update user's active session to NULL Only if its associated with the requested token
-			_, err = userService.UpdateUserActiveSessionAndToken(&userModelP.Id, nil, nil)
+			_, err = userService.EndUserActiveSessionAndToken(userModelP)
 			if err != nil {
 				return err
 			}

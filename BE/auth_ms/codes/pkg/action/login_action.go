@@ -18,7 +18,7 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 
 	// Verify Username
 	userService := service.NewUserService(nil)
-	userModelP, err := userService.GetUser(userLoginReqP)
+	userModelP, err := userService.GetUserByUsername(userLoginReqP)
 	if err != nil {
 		return nil, fiber.ErrUnauthorized
 	}
@@ -54,14 +54,14 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 	err = func(tx *gorm.DB) error {
 		// Create a New Associated Session
 		sessionService := service.NewSessionService(tx)
-		sessionModelP, err := sessionService.StoreSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
+		sessionModelP, err := sessionService.StartSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
 		if err != nil {
 			return err
 		}
 
 		// Update user with new session id and new token id
 		userService = service.NewUserService(tx)
-		_, err = userService.UpdateUserActiveSessionAndToken(&userModelP.Id, &sessionModelP.Id, ulidP)
+		_, err = userService.StartUserActiveSessionAndToken(userModelP, &sessionModelP.Id, ulidP)
 		if err != nil {
 			return err
 		}
