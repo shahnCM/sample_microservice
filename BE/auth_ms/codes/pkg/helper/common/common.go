@@ -186,7 +186,7 @@ func PaginateResponse(searchKey string, currentUrl string, currentPage int, size
 	}
 
 	var metaMap, linksMap map[string]any
-	meta := fmt.Sprintf(`{"path":"%s","current_page":%d,"from":%d,"last_page":%d,"limit":%d,"to":%d,"total":%d}`, currentUrl, currentPage, from, lastPage, size, to, total)
+	meta := fmt.Sprintf(`{"path":"%s","current_page":%d,"from":%d,"last_page":%d,"per_page":%d,"to":%d,"total":%d}`, currentUrl, currentPage, from, lastPage, size, to, total)
 	links := fmt.Sprintf(`{"first":"%s&page=%d&per_page=%d","last":"%s&page=%d&per_page=%d","next":"%s&page=%d&per_page=%d","prev":"%s&page=%d&per_page=%d"}`, currentUrl, 1, size, currentUrl, lastPage, size, currentUrl, nextPage, size, currentUrl, prevPage, size)
 	json.Unmarshal([]byte(meta), &metaMap)
 	json.Unmarshal([]byte(links), &linksMap)
