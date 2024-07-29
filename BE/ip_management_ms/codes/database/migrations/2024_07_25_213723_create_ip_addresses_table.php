@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('ip')->unique();
             $table->string('label');
-            $table->timestamps();
+            $table->timestamps(3);
         });
     }
 

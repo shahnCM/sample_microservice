@@ -10,15 +10,14 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('logs', function (Blueprint $table) {
+        Schema::create('action_logs', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
-            $table->string('username');
-            $table->string('session_token_trace_id')->nullable();
+            $table->string('username')->nullable();
+            $table->string('session_token_trace_id');
             $table->enum('action', ['store', 'update', 'delete']);
             $table->text('change');
-            $table->timestamp('logged_at')->useCurrent();
-            $table->timestamps();
+            $table->timestamps(3);
         });
     }
 
@@ -27,6 +26,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('logs');
+        Schema::dropIfExists('action_logs');
     }
 };

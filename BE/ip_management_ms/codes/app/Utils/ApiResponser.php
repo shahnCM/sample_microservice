@@ -22,7 +22,7 @@ class ApiResponser
         return response()->json($response, $code);
     }
 
-    public function sendErrorResponse($message, $code = 200)
+    public function sendErrorResponse($message, $code = 200, $validationsErrors = null)
     {
         $response = [
             'status' => "Error",
@@ -31,6 +31,9 @@ class ApiResponser
         ];
         if (!empty($message)) {
             $response['message'] = $message;
+        }
+        if (!is_null($validationsErrors)) {
+            $response['validation_errors'] = $validationsErrors;
         }
         return response()->json($response, $code);
     }

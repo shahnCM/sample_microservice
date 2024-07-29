@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Interfaces\RepositoryInterface;
+use App\Models\ActionLog;
 use App\Models\IpAddress;
+use App\Repositories\ActionLogRepository;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class IpAddressManageService
@@ -28,25 +31,27 @@ class IpAddressManageService
     public function createIpAddress(array $data): IpAddress
     {
         $ipAddress = $this->ipAddressRepository->store($data);
-        $this->logAction('store', $ipAddress, Auth::user());
+        $this->logAction('store', $ipAddress->getChangeLogs(), Auth::user());
+
         return $ipAddress;
     }
 
     public function updateIpAddress(array $data, int $id): IpAddress
     {
-        $ipAddress = $this->ipAddressRepository->update($data, $id);
-        $this->logAction('update', $ipAddress, Auth::user());
+        $ipAddress = $this->ipAddressRepository->getById($id);
+        $this->ipAddressRepository->update($data, $ipAddress);
+        $this->logAction('update', $ipAddress->getChangeLogs(), Auth::user());
+
         return $ipAddress;
     }
 
-    protected function logAction(string $action, IpAddress $ipAddress, $user): void
+    protected function logAction(string $action, string|array $change, $user): void
     {
-        $ipAddress->logs()->create([
+        ActionLog::create([
             'user_id' => $user->id,
-            'username' => $user->name,
+            'session_token_trace_id' => $user->sessionTokenTraceId,
             'action' => $action,
-            'change' => json_encode($ipAddress->getChanges()),
-            'logged_at' => now(),
+            'change' => $change,
         ]);
     }
 }

@@ -6,8 +6,7 @@ use App\Models\User;
 use App\Services\JwtService;
 use Auth;
 use Closure;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 class ApiUserJwtAuth
 {
@@ -23,7 +22,7 @@ class ApiUserJwtAuth
         $token = $request->header('Authorization');
 
         if (!$token) {
-            throw new \Exception("Invalid Jwt Token");
+            throw new UnauthorizedHttpException('Invalid JWT format');
         }
 
         try {
@@ -34,7 +33,7 @@ class ApiUserJwtAuth
             Auth::setUser($user);
 
         } catch (\Exception $e) {
-            throw new \Exception("Invalid Jwt Token");
+            throw new UnauthorizedHttpException('Invalid JWT format');
         }
 
         return $next($request);
