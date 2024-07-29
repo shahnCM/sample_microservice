@@ -1,6 +1,7 @@
-### API Documentation
+## API Documentation
 
-#### Base URL
+
+### Base URL
 
 The base URL for all API requests is:
 
