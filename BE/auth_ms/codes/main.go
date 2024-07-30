@@ -17,6 +17,7 @@ import (
 )
 
 func main() {
+
 	log.Println("SERVER INITIATING")
 
 	if err := godotenv.Load(".env"); err != nil {
@@ -32,12 +33,6 @@ func main() {
 	}
 	time.Local = localTimeZone
 
-	// if err := queue.Init(); err != nil {
-	// 	log.Printf("Failed to initialize RabbitMQ queue: %v", err)
-	// } else {
-	// 	log.Println("Connected to RabbitMQ")
-	// }
-
 	if err := mariadb10.ConnectToMariaDb10(); err != nil {
 		log.Printf("Failed to initialize Database: %v", err)
 	} else {
@@ -47,7 +42,6 @@ func main() {
 
 	app := fiber.New(fiberconfig.FiberConfig())
 	app.Use(recover.New(fiberconfig.RecoveryConfig()))
-
 	app.Use(logger.New(logger.Config{
 		Format:     "[${time}] ${status} - ${latency} ${method} ${path}\n",
 		TimeFormat: "15:04:05",
@@ -62,4 +56,5 @@ func main() {
 	}
 
 	log.Println(app.Listen(":" + port))
+
 }

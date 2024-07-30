@@ -59,7 +59,11 @@ func hmacSHA256(data *string, secret *string) *string {
 }
 
 // Generate JWT token
-func generateJWT(claims Claims, exp *int64) (*string, *int64, error) {
+func generateJWT(claimsP *Claims, exp *int64) (*string, *int64, error) {
+
+	claims := *claimsP
+	claims.Type = enum.JWT_TOKEN
+
 	header := map[string]string{
 		"alg": "HS256",
 		"typ": "JWT",
@@ -82,8 +86,6 @@ func generateJWT(claims Claims, exp *int64) (*string, *int64, error) {
 		claims.Exp = &expirationTimeUnix
 	}
 
-	claims.Type = enum.JWT_TOKEN
-
 	claimsJSON, err := json.Marshal(claims)
 	if err != nil {
 		return nil, nil, err
@@ -99,7 +101,11 @@ func generateJWT(claims Claims, exp *int64) (*string, *int64, error) {
 }
 
 // Generate Refresh Token
-func generateRefreshToken(claims Claims) (*string, *int64, error) {
+func generateRefreshToken(claimsP *Claims) (*string, *int64, error) {
+
+	claims := *claimsP
+	claims.Type = enum.REFRESH_TOKEN
+
 	expirationTime, err := time.ParseDuration(config.GetJwtConfig().RefreshExpiresIn)
 	if err != nil {
 		return nil, nil, err
@@ -107,8 +113,6 @@ func generateRefreshToken(claims Claims) (*string, *int64, error) {
 
 	expirationTimeUnix := time.Now().Add(expirationTime).Unix()
 	claims.Exp = &expirationTimeUnix
-
-	claims.Type = enum.REFRESH_TOKEN
 
 	claimsJSON, err := json.Marshal(claims)
 	if err != nil {
@@ -132,7 +136,7 @@ func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string, ex
 
 	safeasync.Run(func() {
 		defer wg.Done() // Decrement the counter when the goroutine completes
-		jwtTokenP, jwtExpiresInP, _ := generateJWT(*claimsP, exp)
+		jwtTokenP, jwtExpiresInP, _ := generateJWT(claimsP, exp)
 		results <- &dto.TokenDto{
 			Type:     "JWT",
 			Token:    jwtTokenP,
@@ -142,7 +146,7 @@ func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string, ex
 
 	safeasync.Run(func() {
 		defer wg.Done() // Decrement the counter when the goroutine completes
-		refreshTokenP, refreshExpiresInP, _ := generateRefreshToken(*claimsP)
+		refreshTokenP, refreshExpiresInP, _ := generateRefreshToken(claimsP)
 		results <- &dto.TokenDto{
 			Type:     "REFRESH",
 			Token:    refreshTokenP,

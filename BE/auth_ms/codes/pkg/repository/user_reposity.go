@@ -32,7 +32,9 @@ func (r *baseRepository) FindUser(identifier string) (*model.User, error) {
 		// Preload("LastSession", func(db *gorm.DB) *gorm.DB {
 		// 	return db.Order("id DESC").Limit(1)
 		// }).
-		Where("username = ? OR email = ?", identifier, identifier).
+		// Where("username = ? OR email = ?", identifier, identifier).
+		Select("id", "username", "password", "role", "last_session_id").
+		Where("username = ?", identifier).
 		First(&user).Error; err != nil {
 		return nil, err
 	}

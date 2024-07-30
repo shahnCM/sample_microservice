@@ -9,12 +9,12 @@ import (
 	"auth_ms/pkg/service"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 )
 
-func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
+func RefreshOptimized(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 
 	// declaring service response and error
 	var wg sync.WaitGroup
@@ -50,39 +50,60 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 	})
 
 	wg.Wait()
-
 	close(statusResults)
 	close(claimsResults)
 
-	totalStatusResults := 0
-	for result := range statusResults {
-		totalStatusResults += result
-	}
-
-	if totalStatusResults-209 != 400 {
-		return nil, fiber.NewError(422, "Can't Refresh: Jwt token hasn't been expired yet")
-	}
-
 	/**
+	 * checking pair integrity at first
 	 * total should be 609 indecates that we received
 	 * 401 - 1 = 400 from Jwt Verification
 	 * 200 + 9 = 209 from Refresh Verification
 	 */
 
-	var claims *service.Claims
+	var claimsJwt *service.Claims
 	var claimsArr []*service.Claims
 	for result := range claimsResults {
 		claimsArr = append(claimsArr, result)
 	}
-	// Checking pair integrity of refresh and jwt token
-	if *claimsArr[0].TokenId != *claimsArr[1].TokenId {
+	if claimsArr[0].TokenId == nil || claimsArr[1].TokenId == nil || *claimsArr[0].TokenId != *claimsArr[1].TokenId {
 		return nil, fiber.NewError(422, "Invalid Refresh/Jwt token")
 	}
-	if claimsArr[0].Type == enum.JWT_TOKEN {
-		claims = claimsArr[0]
-	} else {
-		claims = claimsArr[1]
+	totalStatusResults := 0
+	for result := range statusResults {
+		totalStatusResults += result
 	}
+	if totalStatusResults-209 != 400 {
+		return nil, fiber.NewError(422, "Can't Refresh: Jwt token hasn't been expired yet")
+	}
+	if claimsArr[0].Type == enum.JWT_TOKEN {
+		claimsJwt = claimsArr[0]
+	} else {
+		claimsJwt = claimsArr[1]
+	}
+
+	hashMakeChan := make(chan *string)
+	defer close(hashMakeChan)
+	safeasync.Run(func() {
+
+		userService := service.NewUserService(nil)
+		userModelP, err := userService.GetUserById(&claimsJwt.UserId, false)
+		if err != nil {
+			hashMakeChan <- nil
+			return
+		}
+
+		if !common.CompareHash(claimsJwt.TokenId, userModelP.SessionTokenTraceId) {
+			hashMakeChan <- nil
+			return
+		}
+
+		hashedUlidP, err := common.GenerateHash(userModelP.SessionTokenTraceId)
+		if err != nil {
+			hashMakeChan <- nil
+			return
+		}
+		hashMakeChan <- hashedUlidP
+	})
 
 	// Begin Transaction
 	tx := mariadb10.GetMariaDb10().Begin()
@@ -90,11 +111,11 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 		return nil, fiber.ErrInternalServerError
 	}
 
-	tokenDataP, err := func(tx *gorm.DB) (any, *fiber.Error) {
+	tokenDataP, err := func() (any, *fiber.Error) {
 
 		// Getting User and Locking for Update
 		userService := service.NewUserService(tx)
-		userModelP, err := userService.GetUserById(&claims.UserId, true)
+		userModelP, err := userService.GetUserById(&claimsJwt.UserId, true)
 		if err != nil {
 			return nil, fiber.NewError(404, "Invalid Refresh/Jwt token: User not found")
 		}
@@ -104,17 +125,6 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 			return nil, fiber.NewError(422, "No active session to refresh")
 		}
 
-		// Check if user's active token_id matches with the claim's token_id
-		if !common.CompareHash(claims.TokenId, userModelP.SessionTokenTraceId) {
-			return nil, fiber.NewError(422, "Invalid Refresh/Jwt token")
-		}
-
-		// Hashing sessionTokenTraceId
-		hashedUlid, err := common.GenerateHash(userModelP.SessionTokenTraceId)
-		if err != nil {
-			return nil, fiber.NewError(422, "Hash error")
-		}
-
 		// Getting Session and Locking for Update
 		sessionService := service.NewSessionService(tx)
 		sessionModelP, err := sessionService.GetSession(userModelP.LastSessionId, true)
@@ -122,18 +132,26 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 			return nil, fiber.NewError(404, "Invalid Refresh/Jwt token: User session not found")
 		}
 
-		// Compare current session time with claims session time.
-		// if current session time is greater than claims session time than pass current session time as exp for new token
-		// otherwise pass nil
+		/**
+		 * Compare current session time with claims session time.
+		 * if current session time is greater than claims session time
+		 * than pass current session time as exp for new token
+		 * otherwise pass nil
+		 */
 
-		var tokenExp *int64
+		var jwtTokenExp *int64
 		dbSessionEndTimeUnix := sessionModelP.EndsAt.Unix()
-		if dbSessionEndTimeUnix > *claims.Exp {
-			tokenExp = &dbSessionEndTimeUnix
+		if dbSessionEndTimeUnix > time.Now().Unix() && dbSessionEndTimeUnix > *claimsJwt.Exp {
+			jwtTokenExp = &dbSessionEndTimeUnix
+		}
+
+		hashedUlidP := <-hashMakeChan
+		if hashedUlidP == nil {
+			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
 
 		// Set claims & Generate a new JWT token and Associated Refresh Token
-		responseP, err := service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlid, tokenExp)
+		responseP, err := service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlidP, jwtTokenExp)
 		if err != nil {
 			return nil, fiber.NewError(500, "Internal server error: Can't issue token at this moment")
 		}
@@ -148,7 +166,7 @@ func Refresh(jwtToken *string, refreshToken *string) (any, *fiber.Error) {
 		}
 
 		return tokenDataP, nil
-	}(tx)
+	}()
 
 	if err != nil {
 		log.Println("ERROR: ", err.Error())

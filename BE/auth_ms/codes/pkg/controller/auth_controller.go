@@ -61,9 +61,8 @@ func RefreshToken(ctx *fiber.Ctx) error {
 	if validationError, validationErrorResponse := common.ParseRequestBody(ctx, refreshTokenReqP); validationError != nil {
 		return validationErrorResponse
 	}
-	refreshToken := *refreshTokenReqP.Token
 
-	tokenDataP, err := action.Refresh(&jwtToken, &refreshToken)
+	tokenDataP, err := action.RefreshOptimized(&jwtToken, refreshTokenReqP.Token)
 	if err != nil {
 		return common.ErrorResponse(ctx, err.Code, err.Message)
 	}
