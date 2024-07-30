@@ -10,12 +10,39 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 )
 
 func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.Error) {
-	// declaring service response and error
-	var err error
+
+	ulidPChan := make(chan *string)
+	defer close(ulidPChan)
+
+	hashedUlidPChan := make(chan *string)
+	defer close(hashedUlidPChan)
+
+	passMatchChan := make(chan bool)
+	defer close(passMatchChan)
+
+	// Generate ULID for Token
+	safeasync.Run(func() {
+		ulidP, err := common.GenerateULID()
+		if err != nil {
+			ulidPChan <- nil
+			hashedUlidPChan <- nil
+			return
+		}
+		ulidPChan <- ulidP
+
+		// Generate Hash for Ulid
+		safeasync.Run(func() {
+			hashedUlidP, err := common.GenerateHash(ulidP)
+			if err != nil {
+				hashedUlidPChan <- nil
+				return
+			}
+			hashedUlidPChan <- hashedUlidP
+		})
+	})
 
 	// Verify Username
 	userService := service.NewUserService(nil)
@@ -24,38 +51,43 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 		return nil, fiber.ErrUnauthorized
 	}
 
-	// Compare password
-	if !common.CompareHash(&userModelP.Password, &userLoginReqP.Password) {
+	// compare pass asynchronously
+	safeasync.Run(func() {
+		if !common.CompareHash(&userModelP.Password, &userLoginReqP.Password) {
+			passMatchChan <- false
+			return
+		}
+		passMatchChan <- true
+	})
+
+	ulidP := <-ulidPChan
+	if ulidP == nil {
+		return nil, fiber.ErrUnauthorized
+	}
+	hashedUlidP := <-hashedUlidPChan
+	if ulidP == nil {
 		return nil, fiber.ErrUnauthorized
 	}
 
-	// Generate ULID for Token
-	ulidP, err := common.GenerateULID()
-	if err != nil {
-		return nil, fiber.ErrInternalServerError
-	}
-
-	hashedUlid, err := common.GenerateHash(ulidP)
-	if err != nil {
-		return nil, fiber.ErrInternalServerError
-	}
-
 	// Set claims & Generate a new JWT token and Associated Refresh Token
-	serviceResponseP, err := service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlid, nil)
+	serviceResponseP, err := service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlidP, nil)
 	if err != nil {
 		return nil, fiber.ErrInternalServerError
 	}
 	tokenDataP := serviceResponseP.Data.(*dto.TokenDataDto)
 
-	defer safeasync.Run(func() {
+	if passMatched := <-passMatchChan; !passMatched {
+		return nil, fiber.ErrUnauthorized
+	}
+
+	safeasync.Run(func() {
 
 		tx := mariadb10.GetMariaDb10().Begin()
 		if err = tx.Error; err != nil {
-			// return nil, fiber.ErrInternalServerError
-			return
+			return // return nil, fiber.ErrInternalServerError
 		}
 
-		err = func(tx *gorm.DB) error {
+		err = func() error {
 			// Create a New Associated Session
 			sessionService := service.NewSessionService(tx)
 			sessionModelP, err := sessionService.StartSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
@@ -79,20 +111,18 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 			}
 
 			return nil
-		}(tx)
+		}()
 
 		if err != nil {
 			if err = tx.Rollback().Error; err != nil {
 				log.Println(err.Error())
 			}
-			// return nil, fiber.ErrInternalServerError
-			return
+			return // nil, fiber.ErrInternalServerError
 		}
 
 		if err = tx.Commit().Error; err != nil {
 			log.Println(err.Error())
-			// return nil, fiber.ErrInternalServerError
-			return
+			return // nil, fiber.ErrInternalServerError
 		}
 	})
 
