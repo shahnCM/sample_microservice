@@ -4,6 +4,7 @@ import (
 	"auth_ms/pkg/dto"
 	"auth_ms/pkg/dto/request"
 	"auth_ms/pkg/helper/common"
+	"auth_ms/pkg/helper/safeasync"
 	"auth_ms/pkg/provider/database/mariadb10"
 	"auth_ms/pkg/service"
 	"log"
@@ -40,54 +41,60 @@ func Login(userLoginReqP *request.UserLoginDto) (*dto.UserTokenDataDto, *fiber.E
 	}
 
 	// Set claims & Generate a new JWT token and Associated Refresh Token
-	serviceResponseP, err := service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlid)
+	serviceResponseP, err := service.IssueJwtWithRefreshToken(userModelP.Id, userModelP.Role, hashedUlid, nil)
 	if err != nil {
 		return nil, fiber.ErrInternalServerError
 	}
 	tokenDataP := serviceResponseP.Data.(*dto.TokenDataDto)
 
-	tx := mariadb10.GetMariaDb10().Begin()
-	if err = tx.Error; err != nil {
-		return nil, fiber.ErrInternalServerError
-	}
+	defer safeasync.Run(func() {
 
-	err = func(tx *gorm.DB) error {
-		// Create a New Associated Session
-		sessionService := service.NewSessionService(tx)
-		sessionModelP, err := sessionService.StartSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
-		if err != nil {
-			return err
+		tx := mariadb10.GetMariaDb10().Begin()
+		if err = tx.Error; err != nil {
+			// return nil, fiber.ErrInternalServerError
+			return
 		}
 
-		// Update user with new session id and new token id
-		userService = service.NewUserService(tx)
-		_, err = userService.StartUserActiveSessionAndToken(userModelP, &sessionModelP.Id, ulidP)
-		if err != nil {
-			return err
-		}
-
-		// End last active session
-		if userModelP.LastSessionId != nil {
-			_, err = sessionService.EndSession(userModelP.LastSessionId)
+		err = func(tx *gorm.DB) error {
+			// Create a New Associated Session
+			sessionService := service.NewSessionService(tx)
+			sessionModelP, err := sessionService.StartSession(&userModelP.Id, ulidP, tokenDataP.Jwt.TokenExp, tokenDataP.Refresh.TokenExp)
 			if err != nil {
 				return err
 			}
+
+			// Update user with new session id and new token id
+			userService = service.NewUserService(tx)
+			_, err = userService.StartUserActiveSessionAndToken(userModelP, &sessionModelP.Id, ulidP)
+			if err != nil {
+				return err
+			}
+
+			// End last active session
+			if userModelP.LastSessionId != nil {
+				_, err = sessionService.EndSession(userModelP.LastSessionId)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}(tx)
+
+		if err != nil {
+			if err = tx.Rollback().Error; err != nil {
+				log.Println(err.Error())
+			}
+			// return nil, fiber.ErrInternalServerError
+			return
 		}
 
-		return nil
-	}(tx)
-
-	if err != nil {
-		if err = tx.Rollback().Error; err != nil {
+		if err = tx.Commit().Error; err != nil {
 			log.Println(err.Error())
+			// return nil, fiber.ErrInternalServerError
+			return
 		}
-		return nil, fiber.ErrInternalServerError
-	}
-
-	if err = tx.Commit().Error; err != nil {
-		log.Println(err.Error())
-		return nil, fiber.ErrInternalServerError
-	}
+	})
 
 	return &dto.UserTokenDataDto{
 		TokenDataDto: tokenDataP,

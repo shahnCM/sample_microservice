@@ -14,7 +14,7 @@ type SessionRepository interface {
 	FindUserSessions(userIdP *string, limit, offset *int) (*[]*model.Session, error)
 	CreateSession(sessionModelP *model.Session) error
 	SaveSession(sessionModelP *model.Session) error
-	UpdateSession(sessionIdP *uint, updates *map[string]any) error
+	UpdateSession(sessionIdP *uint, sessionModelP *model.Session) error
 }
 
 func NewSessionRepository(tx *gorm.DB) SessionRepository {
@@ -70,10 +70,10 @@ func (r *baseRepository) SaveSession(sessionModelP *model.Session) error {
 	return r.db.Unscoped().Save(sessionModelP).Error
 }
 
-func (r *baseRepository) UpdateSession(sessionIdP *uint, updatesP *map[string]any) error {
+func (r *baseRepository) UpdateSession(sessionIdP *uint, sessionModelP *model.Session) error {
 	if err := r.db.Model(&model.Session{}).Unscoped().
 		Where("id = ?", sessionIdP).
-		Updates(updatesP).
+		Updates(sessionModelP).
 		Error; err != nil {
 
 		return err

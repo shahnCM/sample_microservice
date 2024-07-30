@@ -92,12 +92,12 @@ func (s *baseService) RefreshSession(
 
 func (s *baseService) EndSession(sessionIdP *uint) (any, error) {
 	sessionRepo := repository.NewSessionRepository(s.tx)
-	updatesP := &map[string]interface{}{
-		"ends_at":         time.Now(),
-		"refresh_ends_at": time.Now(),
-		"revoked":         true,
+	sessionModelP := &model.Session{
+		EndsAt:        time.Now(),
+		RefreshEndsAt: time.Now(),
+		Revoked:       true,
 	}
-	err := sessionRepo.UpdateSession(sessionIdP, updatesP)
+	err := sessionRepo.UpdateSession(sessionIdP, sessionModelP)
 	if err != nil {
 		return nil, err
 	}

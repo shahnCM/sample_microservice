@@ -4,6 +4,7 @@ import (
 	"auth_ms/pkg/config"
 	"auth_ms/pkg/dto"
 	"auth_ms/pkg/dto/response"
+	"auth_ms/pkg/enum"
 	"auth_ms/pkg/helper/safeasync"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -16,6 +17,7 @@ import (
 )
 
 type Claims struct {
+	Type     string  `json:"type"`
 	UserId   uint    `json:"user_id"`
 	UserRole string  `json:"user_role"`
 	TokenId  *string `json:"token_id"`
@@ -57,7 +59,7 @@ func hmacSHA256(data *string, secret *string) *string {
 }
 
 // Generate JWT token
-func generateJWT(claimsP *Claims) (*string, *int64, error) {
+func generateJWT(claims Claims, exp *int64) (*string, *int64, error) {
 	header := map[string]string{
 		"alg": "HS256",
 		"typ": "JWT",
@@ -68,15 +70,21 @@ func generateJWT(claimsP *Claims) (*string, *int64, error) {
 	}
 	encodedHeader := base64URLEncode(&headerJSON)
 
-	expirationTime, err := time.ParseDuration(config.GetJwtConfig().JwtExpiresIn)
-	if err != nil {
-		return nil, nil, err
+	if exp != nil {
+		claims.Exp = exp
+	} else {
+		expirationTime, err := time.ParseDuration(config.GetJwtConfig().JwtExpiresIn)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		expirationTimeUnix := time.Now().Add(expirationTime).Unix()
+		claims.Exp = &expirationTimeUnix
 	}
 
-	expirationTimeUnix := time.Now().Add(expirationTime).Unix()
-	claimsP.Exp = &expirationTimeUnix
+	claims.Type = enum.JWT_TOKEN
 
-	claimsJSON, err := json.Marshal(claimsP)
+	claimsJSON, err := json.Marshal(claims)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -87,20 +95,22 @@ func generateJWT(claimsP *Claims) (*string, *int64, error) {
 	signature := hmacSHA256(&unsignedToken, &config.GetJwtConfig().JwtSecret)
 	token := unsignedToken + "." + *signature
 
-	return &token, &expirationTimeUnix, nil
+	return &token, claims.Exp, nil
 }
 
 // Generate Refresh Token
-func generateRefreshToken(claimsP *Claims) (*string, *int64, error) {
+func generateRefreshToken(claims Claims) (*string, *int64, error) {
 	expirationTime, err := time.ParseDuration(config.GetJwtConfig().RefreshExpiresIn)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	expirationTimeUnix := time.Now().Add(expirationTime).Unix()
-	claimsP.Exp = &expirationTimeUnix
+	claims.Exp = &expirationTimeUnix
 
-	claimsJSON, err := json.Marshal(claimsP)
+	claims.Type = enum.REFRESH_TOKEN
+
+	claimsJSON, err := json.Marshal(claims)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -110,10 +120,10 @@ func generateRefreshToken(claimsP *Claims) (*string, *int64, error) {
 	signature := hmacSHA256(encodedClaims, &config.GetJwtConfig().RefreshSecret)
 	refreshToken := *encodedClaims + "." + *signature
 
-	return &refreshToken, &expirationTimeUnix, nil
+	return &refreshToken, claims.Exp, nil
 }
 
-func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string) (*response.GenericServiceResponseDto, error) {
+func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string, exp *int64) (*response.GenericServiceResponseDto, error) {
 	claimsP := SetClaims(userId, userRole, tokenIdP)
 
 	results := make(chan *dto.TokenDto, 2)
@@ -122,7 +132,7 @@ func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string) (*
 
 	safeasync.Run(func() {
 		defer wg.Done() // Decrement the counter when the goroutine completes
-		jwtTokenP, jwtExpiresInP, _ := generateJWT(claimsP)
+		jwtTokenP, jwtExpiresInP, _ := generateJWT(*claimsP, exp)
 		results <- &dto.TokenDto{
 			Type:     "JWT",
 			Token:    jwtTokenP,
@@ -132,7 +142,7 @@ func IssueJwtWithRefreshToken(userId uint, userRole string, tokenIdP *string) (*
 
 	safeasync.Run(func() {
 		defer wg.Done() // Decrement the counter when the goroutine completes
-		refreshTokenP, refreshExpiresInP, _ := generateRefreshToken(claimsP)
+		refreshTokenP, refreshExpiresInP, _ := generateRefreshToken(*claimsP)
 		results <- &dto.TokenDto{
 			Type:     "REFRESH",
 			Token:    refreshTokenP,
